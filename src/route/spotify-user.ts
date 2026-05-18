@@ -4,33 +4,26 @@ import {
   FastifyRequest,
   FastifyReply,
 } from "fastify";
-import _get from "lodash/get";
-import httpUtils from "../utils/httpUtils";
-import mongoDbUtils from "../utils/mongoDbUtils";
+import { fetchAndStoreProfile } from "../services/spotify/user";
 import { userLink } from "../utils/routeLink";
+
+type ProfileRequest = FastifyRequest<{
+  Querystring: { lineUserId: string };
+}>;
 
 const user = (
   fastify: FastifyInstance,
   opts: FastifyServerOptions,
   done: any
 ) => {
-  /**
-   * @api {get} /user/profile 取得用戶的個人資料
-   */
   fastify.get(
     userLink.profile,
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const spotifyResponse = await httpUtils.httpFetchGetWithToken({
-        url: "https://api.spotify.com/v1/me",
-      });
-      const errorStatus = _get(spotifyResponse, "error.status");
-      if (errorStatus) {
-        return;
-      } else {
-        const userId = _get(spotifyResponse, "id");
-        await mongoDbUtils.updateUserId(userId);
-        return userId;
-      }
+    async (request: ProfileRequest, reply: FastifyReply) => {
+      const { lineUserId } = request.query;
+      if (!lineUserId) return reply.code(400).send("Missing lineUserId");
+      const spotifyUserId = await fetchAndStoreProfile(lineUserId);
+      if (!spotifyUserId) return reply.code(500).send("Failed to fetch profile");
+      return reply.code(200).send({ spotifyUserId });
     }
   );
 

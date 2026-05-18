@@ -1,31 +1,22 @@
 import _get from "lodash/get";
 import _isEqual from "lodash/isEqual";
 import mongoDbUtils from "./mongoDbUtils";
-import { routeLink, authLink } from "./routeLink";
+import { refreshAccessToken } from "../services/spotify/auth";
 
-interface HttpFetchPostProps {
+interface HttpFetchProps {
   url: string;
   headers?: any;
   body?: any;
 }
 
-interface HttpFetchGetProps {
-  url: string;
-  headers?: any;
-  body?: any;
+interface AuthedFetchProps extends HttpFetchProps {
+  lineUserId: string;
 }
-
-const refreshLink = `${process.env.BASE_URL}${routeLink.spotify}${authLink.refresh}`;
 
 const utils = {
-  /**
-   * 帶有token的post
-   * @param props
-   * @returns
-   */
-  httpFetchPostWithToken: async (props: HttpFetchPostProps) => {
-    const { url, headers = {}, body = {} } = props;
-    const { access_token } = await mongoDbUtils.getTokens();
+  httpFetchPostWithToken: async (props: AuthedFetchProps): Promise<any> => {
+    const { url, headers = {}, body = {}, lineUserId } = props;
+    const { access_token } = await mongoDbUtils.getTokens(lineUserId);
     const spotifyResponse = await fetch(url, {
       method: "POST",
       headers: {
@@ -37,49 +28,23 @@ const utils = {
     const data = await spotifyResponse.json();
     const errorStatus = _get(data, "error.status");
     if (_isEqual(errorStatus, 401)) {
-      await fetch(refreshLink, {
-        method: "GET",
-      });
-      await utils.httpFetchPostWithToken(props);
-    } else if (errorStatus) {
-      return data;
-    } else {
-      return data;
+      const refreshed = await refreshAccessToken(lineUserId);
+      if (refreshed) return await utils.httpFetchPostWithToken(props);
     }
+    return data;
   },
-  /**
-   * 沒帶token的post
-   * @param props
-   * @returns
-   */
-  httpFetchPost: async (props: HttpFetchPostProps) => {
+  httpFetchPost: async (props: HttpFetchProps): Promise<any> => {
     const { url, headers = {}, body = {} } = props;
     const spotifyResponse = await fetch(url, {
       method: "POST",
       headers: headers,
       body: body,
     });
-    const data = await spotifyResponse.json();
-    const errorStatus = _get(data, "error.status");
-    if (_isEqual(errorStatus, 401)) {
-      await fetch(refreshLink, {
-        method: "GET",
-      });
-      await utils.httpFetchPost(props);
-    } else if (errorStatus) {
-      return data;
-    } else {
-      return data;
-    }
+    return await spotifyResponse.json();
   },
-  /**
-   * 帶有token的get
-   * @param props
-   * @returns
-   */
-  httpFetchGetWithToken: async (props: HttpFetchGetProps) => {
-    const { url, headers = {} } = props;
-    const { access_token } = await mongoDbUtils.getTokens();
+  httpFetchGetWithToken: async (props: AuthedFetchProps): Promise<any> => {
+    const { url, headers = {}, lineUserId } = props;
+    const { access_token } = await mongoDbUtils.getTokens(lineUserId);
     const spotifyResponse = await fetch(url, {
       method: "GET",
       headers: {
@@ -90,39 +55,18 @@ const utils = {
     const data = await spotifyResponse.json();
     const errorStatus = _get(data, "error.status");
     if (_isEqual(errorStatus, 401)) {
-      await fetch(refreshLink, {
-        method: "GET",
-      });
-      await utils.httpFetchGetWithToken(props);
-    } else if (errorStatus) {
-      return data;
-    } else {
-      return data;
+      const refreshed = await refreshAccessToken(lineUserId);
+      if (refreshed) return await utils.httpFetchGetWithToken(props);
     }
+    return data;
   },
-  /**
-   * 沒帶token的get
-   * @param props
-   * @returns
-   */
-  httpFetchGet: async (props: HttpFetchGetProps) => {
+  httpFetchGet: async (props: HttpFetchProps): Promise<any> => {
     const { url, headers = {} } = props;
     const spotifyResponse = await fetch(url, {
       method: "GET",
       headers: headers,
     });
-    const data = await spotifyResponse.json();
-    const errorStatus = _get(data, "error.status");
-    if (_isEqual(errorStatus, 401)) {
-      await fetch(refreshLink, {
-        method: "GET",
-      });
-      await utils.httpFetchGet(props);
-    } else if (errorStatus) {
-      return data;
-    } else {
-      return data;
-    }
+    return await spotifyResponse.json();
   },
 };
 export default utils;

@@ -25,8 +25,8 @@ app.register(mongodb, {
 });
 
 app.register(cookie, {
-  secret: "my-secret", // for cookies signature
-  parseOptions: {}, // options for parsing cookies
+  secret: process.env.COOKIE_SECRET!,
+  parseOptions: {},
 } as FastifyCookieOptions);
 
 app.register(spotify, { prefix: routeLink.spotify });

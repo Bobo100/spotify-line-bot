@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "This project was bootstrapped with Fastify-CLI.",
   "main": "api/serverless.ts",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "nodemon --watch api/serverless.ts",
     "build": "tsc -p tsconfig.json",
@@ -13,8 +16,10 @@
     "@fastify/mongodb": "^8.0.0",
     "@line/bot-sdk": "^8.0.2",
     "@types/lodash": "^4.14.202",
-    "@types/node": "^18.15.0",
+    "@types/node": "^24.0.0",
     "@vercel/node": "^3.0.13",
+    "dotenv": "^16.3.1",
+    "fastify": "^4.0.0",
     "fastify-cli": "^5.9.0",
     "fastify-plugin": "^4.0.0",
     "nodemon": "^3.0.2",
@@ -22,8 +27,6 @@
     "typescript": "^5.3.3"
   },
   "devDependencies": {
-    "dotenv": "^16.3.1",
-    "fastify": "^4.0.0",
     "tap": "^16.1.0"
   }
 }
