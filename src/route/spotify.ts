@@ -51,6 +51,11 @@ const spotify = (
 
   // refreshAccessToken
   fastify.get(authLink.refresh, async (request, reply) => {
+    const provided = request.headers["x-internal-secret"];
+    const expected = process.env.INTERNAL_SECRET;
+    if (!expected || provided !== expected) {
+      return reply.code(401).send("Unauthorized");
+    }
     const clientId = process.env.SPOTIFY_CLIENT_ID;
     const { refresh_token } = await mongoDbUtils.getTokens();
     const Params = new URLSearchParams();

@@ -39,6 +39,7 @@ const utils = {
     if (_isEqual(errorStatus, 401)) {
       await fetch(refreshLink, {
         method: "GET",
+        headers: { "x-internal-secret": process.env.INTERNAL_SECRET ?? "" },
       });
       return await utils.httpFetchPostWithToken(props);
     }
@@ -61,6 +62,7 @@ const utils = {
     if (_isEqual(errorStatus, 401)) {
       await fetch(refreshLink, {
         method: "GET",
+        headers: { "x-internal-secret": process.env.INTERNAL_SECRET ?? "" },
       });
       return await utils.httpFetchPost(props);
     }
@@ -86,6 +88,7 @@ const utils = {
     if (_isEqual(errorStatus, 401)) {
       await fetch(refreshLink, {
         method: "GET",
+        headers: { "x-internal-secret": process.env.INTERNAL_SECRET ?? "" },
       });
       return await utils.httpFetchGetWithToken(props);
     }
@@ -107,6 +110,7 @@ const utils = {
     if (_isEqual(errorStatus, 401)) {
       await fetch(refreshLink, {
         method: "GET",
+        headers: { "x-internal-secret": process.env.INTERNAL_SECRET ?? "" },
       });
       return await utils.httpFetchGet(props);
     }
