@@ -11,9 +11,9 @@ import { playlistLink } from "../utils/routeLink";
 import mongoDbUtils from "../utils/mongoDbUtils";
 
 type AddRequest = FastifyRequest<{
-  Querystring: {
+  Body: {
     uri: string;
-    position: number;
+    position?: number;
   };
 }>;
 
@@ -40,13 +40,13 @@ const playlist = (
   );
 
   /**
-   * @api {get} /playlist/add 加入歌曲到播放清單
+   * @api {post} /playlist/add 加入歌曲到播放清單
    */
-  fastify.get(
+  fastify.post(
     playlistLink.add,
     async (request: AddRequest, reply: FastifyReply) => {
-      const uri = request.query.uri;
-      const position = request.query.position;
+      const uri = request.body.uri;
+      const position = request.body.position;
       // https://api.spotify.com/v1/playlists/{playlist_id}/tracks
       const playlist_id = "5Jjn8bXv6DekewlqTF90pS";
       const Params: { [key: string]: any } = {

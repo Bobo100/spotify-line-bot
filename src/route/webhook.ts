@@ -129,7 +129,12 @@ const handlePostbackEvent = async (postbackEvent: PostbackEvent) => {
   switch (action) {
     case actionCommands.ADD_TRACK:
       const searchResponse = await fetch(
-        `${process.env.BASE_URL}${routeLink.playlist}${playlistLink.add}?uri=${uri}&position=${position}`
+        `${process.env.BASE_URL}${routeLink.playlist}${playlistLink.add}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ uri, position }),
+        }
       );
       if (_isEqual(searchResponse.status, 200)) {
         return await lineUtils.replayMessage(replyToken, {
