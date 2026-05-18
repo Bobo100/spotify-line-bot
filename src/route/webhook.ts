@@ -65,20 +65,20 @@ const webhook = (
       // 這個postback也會被送到webhook 那要做的事情是把該postback的data 加入到spotify的播放清單中
       const body = request.body;
       const events = body.events;
-      const event = events[0];
-      let result = null;
-      switch (event.type) {
-        case "message":
-          result = await handleMessageEvent(event);
-          break;
-        case "postback":
-          await handlePostbackEvent(event);
-          break;
-        default:
-          break;
-      }
+      await Promise.all(
+        events.map(async (event) => {
+          switch (event.type) {
+            case "message":
+              return await handleMessageEvent(event);
+            case "postback":
+              return await handlePostbackEvent(event);
+            default:
+              return;
+          }
+        })
+      );
 
-      return reply.status(200).send(result);
+      return reply.status(200).send();
     }
   );
 
