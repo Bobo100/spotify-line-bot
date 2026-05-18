@@ -47,8 +47,13 @@ const playlist = (
     async (request: AddRequest, reply: FastifyReply) => {
       const uri = request.body.uri;
       const position = request.body.position;
+      const playlist_id = await mongoDbUtils.getPlaylistId();
+      if (!playlist_id) {
+        return reply.code(400).send({
+          error: "playlist_id 尚未設定，請先呼叫 /playlist/playlists 選擇或建立歌單",
+        });
+      }
       // https://api.spotify.com/v1/playlists/{playlist_id}/tracks
-      const playlist_id = "5Jjn8bXv6DekewlqTF90pS";
       const Params: { [key: string]: any } = {
         uris: [uri],
         // 不寫的話會預設加到最後一首
