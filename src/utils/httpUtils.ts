@@ -1,7 +1,7 @@
 import _get from "lodash/get";
 import _isEqual from "lodash/isEqual";
 import mongoDbUtils from "./mongoDbUtils";
-import { routeLink, authLink } from "./routeLink";
+import { refreshAccessToken } from "../services/spotify/auth";
 
 interface HttpFetchPostProps {
   url: string;
@@ -15,13 +15,9 @@ interface HttpFetchGetProps {
   body?: any;
 }
 
-const refreshLink = `${process.env.BASE_URL}${routeLink.spotify}${authLink.refresh}`;
-
 const utils = {
   /**
    * 帶有token的post
-   * @param props
-   * @returns
    */
   httpFetchPostWithToken: async (props: HttpFetchPostProps): Promise<any> => {
     const { url, headers = {}, body = {} } = props;
@@ -37,18 +33,13 @@ const utils = {
     const data = await spotifyResponse.json();
     const errorStatus = _get(data, "error.status");
     if (_isEqual(errorStatus, 401)) {
-      await fetch(refreshLink, {
-        method: "GET",
-        headers: { "x-internal-secret": process.env.INTERNAL_SECRET ?? "" },
-      });
-      return await utils.httpFetchPostWithToken(props);
+      const refreshed = await refreshAccessToken();
+      if (refreshed) return await utils.httpFetchPostWithToken(props);
     }
     return data;
   },
   /**
    * 沒帶token的post
-   * @param props
-   * @returns
    */
   httpFetchPost: async (props: HttpFetchPostProps): Promise<any> => {
     const { url, headers = {}, body = {} } = props;
@@ -57,21 +48,10 @@ const utils = {
       headers: headers,
       body: body,
     });
-    const data = await spotifyResponse.json();
-    const errorStatus = _get(data, "error.status");
-    if (_isEqual(errorStatus, 401)) {
-      await fetch(refreshLink, {
-        method: "GET",
-        headers: { "x-internal-secret": process.env.INTERNAL_SECRET ?? "" },
-      });
-      return await utils.httpFetchPost(props);
-    }
-    return data;
+    return await spotifyResponse.json();
   },
   /**
    * 帶有token的get
-   * @param props
-   * @returns
    */
   httpFetchGetWithToken: async (props: HttpFetchGetProps): Promise<any> => {
     const { url, headers = {} } = props;
@@ -86,18 +66,13 @@ const utils = {
     const data = await spotifyResponse.json();
     const errorStatus = _get(data, "error.status");
     if (_isEqual(errorStatus, 401)) {
-      await fetch(refreshLink, {
-        method: "GET",
-        headers: { "x-internal-secret": process.env.INTERNAL_SECRET ?? "" },
-      });
-      return await utils.httpFetchGetWithToken(props);
+      const refreshed = await refreshAccessToken();
+      if (refreshed) return await utils.httpFetchGetWithToken(props);
     }
     return data;
   },
   /**
    * 沒帶token的get
-   * @param props
-   * @returns
    */
   httpFetchGet: async (props: HttpFetchGetProps): Promise<any> => {
     const { url, headers = {} } = props;
@@ -105,16 +80,7 @@ const utils = {
       method: "GET",
       headers: headers,
     });
-    const data = await spotifyResponse.json();
-    const errorStatus = _get(data, "error.status");
-    if (_isEqual(errorStatus, 401)) {
-      await fetch(refreshLink, {
-        method: "GET",
-        headers: { "x-internal-secret": process.env.INTERNAL_SECRET ?? "" },
-      });
-      return await utils.httpFetchGet(props);
-    }
-    return data;
+    return await spotifyResponse.json();
   },
 };
 export default utils;

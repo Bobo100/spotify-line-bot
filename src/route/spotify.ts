@@ -5,10 +5,10 @@ import {
   FastifyReply,
 } from "fastify";
 import crypto from "crypto";
-import _get from "lodash/get";
 import httpUtils from "../utils/httpUtils";
 import mongoDbUtils from "../utils/mongoDbUtils";
-import { authLink, routeLink, userLink } from "../utils/routeLink";
+import { fetchAndStoreProfile } from "../services/spotify/user";
+import { authLink, routeLink } from "../utils/routeLink";
 
 type MyRequest = FastifyRequest<{
   Querystring: {
@@ -63,37 +63,6 @@ const spotify = (
       .redirect(`https://accounts.spotify.com/authorize?${params.toString()}`);
   });
 
-  // refreshAccessToken
-  fastify.get(authLink.refresh, async (request, reply) => {
-    const provided = request.headers["x-internal-secret"];
-    const expected = process.env.INTERNAL_SECRET;
-    if (!expected || provided !== expected) {
-      return reply.code(401).send("Unauthorized");
-    }
-    const clientId = process.env.SPOTIFY_CLIENT_ID;
-    const { refresh_token } = await mongoDbUtils.getTokens();
-    const Params = new URLSearchParams();
-    Params.append("client_id", clientId!);
-    Params.append("grant_type", "refresh_token");
-    Params.append("refresh_token", refresh_token);
-    const spotifyResponse = await httpUtils.httpFetchPost({
-      url: "https://accounts.spotify.com/api/token",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: Params,
-    });
-    const new_access_token = _get(spotifyResponse, "access_token");
-    const new_refresh_token = _get(spotifyResponse, "refresh_token");
-    if (new_access_token && new_refresh_token) {
-      await mongoDbUtils.updateTokens({
-        access_token: new_access_token,
-        refresh_token: new_refresh_token,
-      });
-      return reply.code(200).send(spotifyResponse);
-    } else {
-      return reply.code(500).send(spotifyResponse);
-    }
-  });
-
   fastify.get(
     authLink.callback,
     async (request: MyRequest, reply: FastifyReply) => {
@@ -145,9 +114,7 @@ const spotify = (
             access_token: access_token,
             refresh_token: refresh_token,
           });
-          await httpUtils.httpFetchGet({
-            url: process.env.BASE_URL + userLink.profile,
-          });
+          await fetchAndStoreProfile();
           return `Success!`;
         }
         return `Failed!`;

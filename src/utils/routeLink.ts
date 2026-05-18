@@ -10,7 +10,6 @@ export const routeLink = {
 export const authLink = {
   default: "/",
   login: "/login",
-  refresh: "/refresh",
   callback: "/callback",
 };
 
