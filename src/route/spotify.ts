@@ -5,18 +5,28 @@ import {
   FastifyReply,
 } from "fastify";
 import crypto from "crypto";
-import { setCodeVerifer } from "../utils/auth";
 import _get from "lodash/get";
 import httpUtils from "../utils/httpUtils";
 import mongoDbUtils from "../utils/mongoDbUtils";
-import { getCodeVerifer } from "../utils/auth";
 import { authLink, routeLink, userLink } from "../utils/routeLink";
 
 type MyRequest = FastifyRequest<{
   Querystring: {
-    code: string;
+    code?: string;
+    state?: string;
   };
 }>;
+
+const VERIFIER_COOKIE = "spotify_pkce_verifier";
+const STATE_COOKIE = "spotify_oauth_state";
+const COOKIE_OPTS = {
+  signed: true,
+  httpOnly: true,
+  sameSite: "lax" as const,
+  secure: true,
+  path: "/",
+  maxAge: 10 * 60,
+};
 
 const callbackLink = `${process.env.BASE_URL}${routeLink.spotify}${authLink.callback}`;
 
@@ -31,6 +41,10 @@ const spotify = (
 
   fastify.get(authLink.login, async (request, reply) => {
     const clientId = process.env.SPOTIFY_CLIENT_ID;
+    const codeVerifier = generateCodeVerifier(128);
+    const codeChallenge = await createCodeChallenge(codeVerifier);
+    const state = crypto.randomBytes(32).toString("hex");
+
     const params = new URLSearchParams();
     params.append("client_id", clientId!);
     params.append("response_type", "code");
@@ -40,13 +54,13 @@ const spotify = (
       "user-read-private user-read-playback-state user-modify-playback-state playlist-read-private playlist-modify playlist-modify-private"
     );
     params.append("code_challenge_method", "S256");
-    const codeVerifier = generateCodeVerifier(128);
-    setCodeVerifer(codeVerifier);
-    const codeChallenge = await createCodeChallenge(codeVerifier);
     params.append("code_challenge", codeChallenge);
-    reply.redirect(
-      `https://accounts.spotify.com/authorize?${params.toString()}`
-    );
+    params.append("state", state);
+
+    reply
+      .setCookie(VERIFIER_COOKIE, codeVerifier, COOKIE_OPTS)
+      .setCookie(STATE_COOKIE, state, COOKIE_OPTS)
+      .redirect(`https://accounts.spotify.com/authorize?${params.toString()}`);
   });
 
   // refreshAccessToken
@@ -84,39 +98,62 @@ const spotify = (
     authLink.callback,
     async (request: MyRequest, reply: FastifyReply) => {
       const code = request.query.code;
-      if (code) {
-        try {
-          const clientId = process.env.SPOTIFY_CLIENT_ID;
-          const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
-          const params = new URLSearchParams();
-          params.append("client_id", clientId!);
-          params.append("client_secret", clientSecret!);
-          params.append("grant_type", "authorization_code");
-          params.append("code", code);
-          params.append("redirect_uri", `${callbackLink}`);
-          const codeVerifier = getCodeVerifer();
-          params.append("code_verifier", codeVerifier!);
-          const result = await httpUtils.httpFetchPost({
-            url: "https://accounts.spotify.com/api/token",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: params,
+      const state = request.query.state;
+      if (!code) {
+        return reply.redirect(process.env.BASE_URL as string);
+      }
+
+      const verifierCookie = request.cookies[VERIFIER_COOKIE];
+      const stateCookie = request.cookies[STATE_COOKIE];
+      const verifierUnsigned = verifierCookie
+        ? request.unsignCookie(verifierCookie)
+        : null;
+      const stateUnsigned = stateCookie
+        ? request.unsignCookie(stateCookie)
+        : null;
+
+      reply.clearCookie(VERIFIER_COOKIE, { path: "/" });
+      reply.clearCookie(STATE_COOKIE, { path: "/" });
+
+      if (
+        !verifierUnsigned?.valid ||
+        !stateUnsigned?.valid ||
+        !state ||
+        stateUnsigned.value !== state
+      ) {
+        return reply.code(400).send("Invalid OAuth state");
+      }
+
+      try {
+        const clientId = process.env.SPOTIFY_CLIENT_ID;
+        const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
+        const params = new URLSearchParams();
+        params.append("client_id", clientId!);
+        params.append("client_secret", clientSecret!);
+        params.append("grant_type", "authorization_code");
+        params.append("code", code);
+        params.append("redirect_uri", `${callbackLink}`);
+        params.append("code_verifier", verifierUnsigned.value!);
+        const result = await httpUtils.httpFetchPost({
+          url: "https://accounts.spotify.com/api/token",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: params,
+        });
+        const { access_token, refresh_token } = result;
+        if (access_token && refresh_token) {
+          await mongoDbUtils.updateTokens({
+            access_token: access_token,
+            refresh_token: refresh_token,
           });
-          const { access_token, refresh_token } = result;
-          if (access_token && refresh_token) {
-            await mongoDbUtils.updateTokens({
-              access_token: access_token,
-              refresh_token: refresh_token,
-            });
-            await httpUtils.httpFetchGet({
-              url: process.env.BASE_URL + userLink.profile,
-            });
-            return `Success!`;
-          } else {
-            return `Failed!`;
-          }
-        } catch (error) {}
-      } else {
-        reply.redirect(process.env.BASE_URL as string);
+          await httpUtils.httpFetchGet({
+            url: process.env.BASE_URL + userLink.profile,
+          });
+          return `Success!`;
+        }
+        return `Failed!`;
+      } catch (error) {
+        request.log.error(error, "OAuth callback failed");
+        return reply.code(500).send("Internal error");
       }
     }
   );
