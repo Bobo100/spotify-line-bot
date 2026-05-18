@@ -46,15 +46,19 @@ const webhook = (
     routeLink.default,
     async (request: WebhookRequest, reply: FastifyReply) => {
       const r = JSON.stringify(request.body);
-      const signature = crypto
+      const expected = crypto
         .createHmac("SHA256", process.env.LINE_CHANNEL_SECRET!)
         .update(r || "")
-        .digest("base64")
-        .toString();
-      if (signature !== request.headers["x-line-signature"]) {
+        .digest();
+      const received = request.headers["x-line-signature"];
+      const receivedBuf =
+        typeof received === "string" ? Buffer.from(received, "base64") : null;
+      if (
+        !receivedBuf ||
+        receivedBuf.length !== expected.length ||
+        !crypto.timingSafeEqual(expected, receivedBuf)
+      ) {
         console.log("Signature mismatch");
-        console.log("Expected:", signature);
-        console.log("Received:", request.headers["x-line-signature"]);
         return reply.status(401).send("Unauthorized");
       }
 
