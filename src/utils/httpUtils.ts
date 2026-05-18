@@ -23,7 +23,7 @@ const utils = {
    * @param props
    * @returns
    */
-  httpFetchPostWithToken: async (props: HttpFetchPostProps) => {
+  httpFetchPostWithToken: async (props: HttpFetchPostProps): Promise<any> => {
     const { url, headers = {}, body = {} } = props;
     const { access_token } = await mongoDbUtils.getTokens();
     const spotifyResponse = await fetch(url, {
@@ -40,19 +40,16 @@ const utils = {
       await fetch(refreshLink, {
         method: "GET",
       });
-      await utils.httpFetchPostWithToken(props);
-    } else if (errorStatus) {
-      return data;
-    } else {
-      return data;
+      return await utils.httpFetchPostWithToken(props);
     }
+    return data;
   },
   /**
    * 沒帶token的post
    * @param props
    * @returns
    */
-  httpFetchPost: async (props: HttpFetchPostProps) => {
+  httpFetchPost: async (props: HttpFetchPostProps): Promise<any> => {
     const { url, headers = {}, body = {} } = props;
     const spotifyResponse = await fetch(url, {
       method: "POST",
@@ -65,19 +62,16 @@ const utils = {
       await fetch(refreshLink, {
         method: "GET",
       });
-      await utils.httpFetchPost(props);
-    } else if (errorStatus) {
-      return data;
-    } else {
-      return data;
+      return await utils.httpFetchPost(props);
     }
+    return data;
   },
   /**
    * 帶有token的get
    * @param props
    * @returns
    */
-  httpFetchGetWithToken: async (props: HttpFetchGetProps) => {
+  httpFetchGetWithToken: async (props: HttpFetchGetProps): Promise<any> => {
     const { url, headers = {} } = props;
     const { access_token } = await mongoDbUtils.getTokens();
     const spotifyResponse = await fetch(url, {
@@ -93,19 +87,16 @@ const utils = {
       await fetch(refreshLink, {
         method: "GET",
       });
-      await utils.httpFetchGetWithToken(props);
-    } else if (errorStatus) {
-      return data;
-    } else {
-      return data;
+      return await utils.httpFetchGetWithToken(props);
     }
+    return data;
   },
   /**
    * 沒帶token的get
    * @param props
    * @returns
    */
-  httpFetchGet: async (props: HttpFetchGetProps) => {
+  httpFetchGet: async (props: HttpFetchGetProps): Promise<any> => {
     const { url, headers = {} } = props;
     const spotifyResponse = await fetch(url, {
       method: "GET",
@@ -117,12 +108,9 @@ const utils = {
       await fetch(refreshLink, {
         method: "GET",
       });
-      await utils.httpFetchGet(props);
-    } else if (errorStatus) {
-      return data;
-    } else {
-      return data;
+      return await utils.httpFetchGet(props);
     }
+    return data;
   },
 };
 export default utils;
