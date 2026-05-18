@@ -8,6 +8,7 @@ type SearchOptions = {
 };
 
 export const searchTracks = async (
+  lineUserId: string,
   keyword: string,
   options: SearchOptions = {}
 ): Promise<any> => {
@@ -18,10 +19,14 @@ export const searchTracks = async (
   params.append("limit", String(options.limit ?? 10));
   params.append("offset", String(options.offset ?? 0));
   return await httpUtils.httpFetchGetWithToken({
+    lineUserId,
     url: "https://api.spotify.com/v1/search?" + params.toString(),
   });
 };
 
-export const fetchSpotifyUrl = async (url: string): Promise<any> => {
-  return await httpUtils.httpFetchGetWithToken({ url });
+export const fetchSpotifyUrl = async (
+  lineUserId: string,
+  url: string
+): Promise<any> => {
+  return await httpUtils.httpFetchGetWithToken({ lineUserId, url });
 };

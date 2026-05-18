@@ -3,25 +3,20 @@ import _isEqual from "lodash/isEqual";
 import mongoDbUtils from "./mongoDbUtils";
 import { refreshAccessToken } from "../services/spotify/auth";
 
-interface HttpFetchPostProps {
+interface HttpFetchProps {
   url: string;
   headers?: any;
   body?: any;
 }
 
-interface HttpFetchGetProps {
-  url: string;
-  headers?: any;
-  body?: any;
+interface AuthedFetchProps extends HttpFetchProps {
+  lineUserId: string;
 }
 
 const utils = {
-  /**
-   * 帶有token的post
-   */
-  httpFetchPostWithToken: async (props: HttpFetchPostProps): Promise<any> => {
-    const { url, headers = {}, body = {} } = props;
-    const { access_token } = await mongoDbUtils.getTokens();
+  httpFetchPostWithToken: async (props: AuthedFetchProps): Promise<any> => {
+    const { url, headers = {}, body = {}, lineUserId } = props;
+    const { access_token } = await mongoDbUtils.getTokens(lineUserId);
     const spotifyResponse = await fetch(url, {
       method: "POST",
       headers: {
@@ -33,15 +28,12 @@ const utils = {
     const data = await spotifyResponse.json();
     const errorStatus = _get(data, "error.status");
     if (_isEqual(errorStatus, 401)) {
-      const refreshed = await refreshAccessToken();
+      const refreshed = await refreshAccessToken(lineUserId);
       if (refreshed) return await utils.httpFetchPostWithToken(props);
     }
     return data;
   },
-  /**
-   * 沒帶token的post
-   */
-  httpFetchPost: async (props: HttpFetchPostProps): Promise<any> => {
+  httpFetchPost: async (props: HttpFetchProps): Promise<any> => {
     const { url, headers = {}, body = {} } = props;
     const spotifyResponse = await fetch(url, {
       method: "POST",
@@ -50,12 +42,9 @@ const utils = {
     });
     return await spotifyResponse.json();
   },
-  /**
-   * 帶有token的get
-   */
-  httpFetchGetWithToken: async (props: HttpFetchGetProps): Promise<any> => {
-    const { url, headers = {} } = props;
-    const { access_token } = await mongoDbUtils.getTokens();
+  httpFetchGetWithToken: async (props: AuthedFetchProps): Promise<any> => {
+    const { url, headers = {}, lineUserId } = props;
+    const { access_token } = await mongoDbUtils.getTokens(lineUserId);
     const spotifyResponse = await fetch(url, {
       method: "GET",
       headers: {
@@ -66,15 +55,12 @@ const utils = {
     const data = await spotifyResponse.json();
     const errorStatus = _get(data, "error.status");
     if (_isEqual(errorStatus, 401)) {
-      const refreshed = await refreshAccessToken();
+      const refreshed = await refreshAccessToken(lineUserId);
       if (refreshed) return await utils.httpFetchGetWithToken(props);
     }
     return data;
   },
-  /**
-   * 沒帶token的get
-   */
-  httpFetchGet: async (props: HttpFetchGetProps): Promise<any> => {
+  httpFetchGet: async (props: HttpFetchProps): Promise<any> => {
     const { url, headers = {} } = props;
     const spotifyResponse = await fetch(url, {
       method: "GET",

@@ -1,58 +1,61 @@
 import _get from "lodash/get";
 import { app } from "../../api/serverless";
+
+const COLLECTION = "users";
+
+const collection = () => app.mongo.db?.collection(COLLECTION);
+
 const utils = {
-  getTokens: async () => {
-    const token = await app.mongo.db?.collection("token").findOne({});
-    const access_token = _get(token, "access_token");
-    const refresh_token = _get(token, "refresh_token");
+  getTokens: async (
+    lineUserId: string
+  ): Promise<{ access_token?: string; refresh_token?: string }> => {
+    const doc = await collection()?.findOne({ lineUserId });
     return {
-      access_token,
-      refresh_token,
+      access_token: _get(doc, "access_token"),
+      refresh_token: _get(doc, "refresh_token"),
     };
   },
-  updateTokens: async (tokens: any) => {
-    app.mongo.db?.collection("token").updateOne(
-      {},
+  updateTokens: async (
+    lineUserId: string,
+    tokens: { access_token: string; refresh_token: string }
+  ) => {
+    await collection()?.updateOne(
+      { lineUserId },
       {
         $set: {
           access_token: tokens.access_token,
           refresh_token: tokens.refresh_token,
         },
+        $setOnInsert: { lineUserId },
       },
       { upsert: true }
     );
   },
-  getUserId: async () => {
-    const user = await app.mongo.db?.collection("user").findOne({});
-    const userId = _get(user, "userId");
-    return userId;
+  getUserId: async (lineUserId: string): Promise<string | undefined> => {
+    const doc = await collection()?.findOne({ lineUserId });
+    return _get(doc, "spotifyUserId");
   },
-  updateUserId: async (userId: string) => {
-    app.mongo.db?.collection("user").updateOne(
-      {},
-      {
-        $set: {
-          userId: userId,
-        },
-      },
+  updateUserId: async (lineUserId: string, spotifyUserId: string) => {
+    await collection()?.updateOne(
+      { lineUserId },
+      { $set: { spotifyUserId }, $setOnInsert: { lineUserId } },
       { upsert: true }
     );
   },
-  getPlaylistId: async () => {
-    const playlist = await app.mongo.db?.collection("playlist").findOne({});
-    const playlistId = _get(playlist, "playlistId");
-    return playlistId;
+  getPlaylistId: async (lineUserId: string): Promise<string | undefined> => {
+    const doc = await collection()?.findOne({ lineUserId });
+    return _get(doc, "playlistId");
   },
-  updatePlaylistId: async (playlistId: string) => {
-    app.mongo.db?.collection("playlist").updateOne(
-      {},
-      {
-        $set: {
-          playlistId: playlistId,
-        },
-      },
+  updatePlaylistId: async (lineUserId: string, playlistId: string) => {
+    await collection()?.updateOne(
+      { lineUserId },
+      { $set: { playlistId }, $setOnInsert: { lineUserId } },
       { upsert: true }
     );
+  },
+  hasTokens: async (lineUserId: string): Promise<boolean> => {
+    const doc = await collection()?.findOne({ lineUserId });
+    return Boolean(_get(doc, "access_token") && _get(doc, "refresh_token"));
   },
 };
 

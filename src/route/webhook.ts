@@ -9,14 +9,16 @@ import { WebhookRequestBody, MessageEvent, PostbackEvent } from "@line/bot-sdk";
 import _get from "lodash/get";
 import processUtils from "../utils/processUtils";
 import lineUtils from "../utils/lineUtils";
+import mongoDbUtils from "../utils/mongoDbUtils";
 import {
   filterSearchType,
   actionCommands,
   footerActionType,
 } from "../utils/lineType";
-import { routeLink } from "../utils/routeLink";
+import { routeLink, authLink } from "../utils/routeLink";
 import { searchTracks, fetchSpotifyUrl } from "../services/spotify/search";
 import { addTrackToPlaylist } from "../services/spotify/playlist";
+import { createLoginToken } from "../services/spotify/loginToken";
 
 type WebhookRequest = FastifyRequest<{
   Body: WebhookRequestBody;
@@ -50,11 +52,13 @@ const webhook = (
       const events = request.body.events;
       await Promise.all(
         events.map(async (event) => {
+          const lineUserId = _get(event, "source.userId");
+          if (!lineUserId) return;
           switch (event.type) {
             case "message":
-              return await handleMessageEvent(event);
+              return await handleMessageEvent(event, lineUserId);
             case "postback":
-              return await handlePostbackEvent(event);
+              return await handlePostbackEvent(event, lineUserId);
             default:
               return;
           }
@@ -72,21 +76,40 @@ const webhook = (
   done();
 };
 
-const handleMessageEvent = async (body: MessageEvent) => {
-  if (body.message.type !== "text") return;
-  return await handleTextEventMessage(body.message.text, body.replyToken);
+const buildLoginReplyText = (lineUserId: string): string => {
+  const token = createLoginToken(lineUserId);
+  const url = `${process.env.BASE_URL}${routeLink.spotify}${authLink.login}?t=${token}`;
+  return `請點以下連結登入 Spotify (10 分鐘內有效):\n${url}`;
 };
 
-const handlePostbackEvent = async (postbackEvent: PostbackEvent) => {
+const handleMessageEvent = async (
+  body: MessageEvent,
+  lineUserId: string
+) => {
+  if (body.message.type !== "text") return;
+  return await handleTextEventMessage(body.message.text, body.replyToken, lineUserId);
+};
+
+const handlePostbackEvent = async (
+  postbackEvent: PostbackEvent,
+  lineUserId: string
+) => {
   const { data } = postbackEvent.postback;
   const replyToken = postbackEvent.replyToken;
+
+  if (!(await mongoDbUtils.hasTokens(lineUserId))) {
+    return await lineUtils.replayMessage(replyToken, {
+      type: "text",
+      text: buildLoginReplyText(lineUserId),
+    });
+  }
 
   const searchParams = new URLSearchParams(data);
   const { action, uri, position, next, type, market, limit, offset } =
     Object.fromEntries(searchParams.entries());
   switch (action) {
     case actionCommands.ADD_TRACK: {
-      const result = await addTrackToPlaylist(uri, position);
+      const result = await addTrackToPlaylist(lineUserId, uri, position);
       return await lineUtils.replayMessage(replyToken, {
         type: "text",
         text: result.ok ? "已加入歌單" : `加入失敗: ${result.error ?? ""}`,
@@ -96,6 +119,7 @@ const handlePostbackEvent = async (postbackEvent: PostbackEvent) => {
     case actionCommands.PERVIOUS_PAGE: {
       const decodedNext = decodeURIComponent(next);
       const spotifyResponse = await fetchSpotifyUrl(
+        lineUserId,
         next + `&type=${type}&market=${market}&limit=${limit}&offset=${offset}`
       );
       const errorStatus = _get(spotifyResponse, "error.status");
@@ -114,9 +138,27 @@ const handlePostbackEvent = async (postbackEvent: PostbackEvent) => {
   }
 };
 
-const handleTextEventMessage = async (text: string, replyToken: string) => {
+const handleTextEventMessage = async (
+  text: string,
+  replyToken: string,
+  lineUserId: string
+) => {
+  if (text.trim().toLowerCase() === "login") {
+    return await lineUtils.replayMessage(replyToken, {
+      type: "text",
+      text: buildLoginReplyText(lineUserId),
+    });
+  }
+
+  if (!(await mongoDbUtils.hasTokens(lineUserId))) {
+    return await lineUtils.replayMessage(replyToken, {
+      type: "text",
+      text: buildLoginReplyText(lineUserId),
+    });
+  }
+
   try {
-    const searchData = await searchTracks(text);
+    const searchData = await searchTracks(lineUserId, text);
     if (_get(searchData, "error.status")) return null;
     return await replyWithSearchResult(replyToken, searchData);
   } catch (error) {

@@ -7,6 +7,10 @@ import {
 import { fetchAndStoreProfile } from "../services/spotify/user";
 import { userLink } from "../utils/routeLink";
 
+type ProfileRequest = FastifyRequest<{
+  Querystring: { lineUserId: string };
+}>;
+
 const user = (
   fastify: FastifyInstance,
   opts: FastifyServerOptions,
@@ -14,10 +18,12 @@ const user = (
 ) => {
   fastify.get(
     userLink.profile,
-    async (_request: FastifyRequest, reply: FastifyReply) => {
-      const userId = await fetchAndStoreProfile();
-      if (!userId) return reply.code(500).send("Failed to fetch profile");
-      return reply.code(200).send({ userId });
+    async (request: ProfileRequest, reply: FastifyReply) => {
+      const { lineUserId } = request.query;
+      if (!lineUserId) return reply.code(400).send("Missing lineUserId");
+      const spotifyUserId = await fetchAndStoreProfile(lineUserId);
+      if (!spotifyUserId) return reply.code(500).send("Failed to fetch profile");
+      return reply.code(200).send({ spotifyUserId });
     }
   );
 
