@@ -3,7 +3,6 @@
 - 日期：2026-10-22（補記）
 - Branch：`claude/explore-project-overview-Avo3i`
 - PR：#1
-- 狀態：已 merge
 
 ## 背景
 
@@ -15,7 +14,7 @@
 2. **fix**：webhook 只處理 `events[0]`，改成處理所有 events
 3. **security**：webhook 簽章比對改用 `crypto.timingSafeEqual`
 4. **fix**：`/playlist/add` 從 GET 改成 POST + JSON body
-5. **security**：`/spotify/refresh` 加上 secret header（後來在 #9 整個移除）
+5. **security**：`/spotify/refresh` 加上 secret header（後來在第 9 項整個移除）
 6. **refactor**：`playlist_id` 改從 MongoDB 讀，不再寫死
 7. **security**：OAuth 的 `code_verifier` 改存簽章 cookie，並加上 `state` 防 CSRF
 8. **chore**：`fastify`、`dotenv` 移到 dependencies；cookie secret 改讀 `COOKIE_SECRET`
