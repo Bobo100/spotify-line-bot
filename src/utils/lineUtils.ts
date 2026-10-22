@@ -259,6 +259,47 @@ const utils = {
       data: `action=${payload.action}&next=${payload.next}`,
     };
   },
+  generatePlaylistQuickReply: (
+    playlists: { id: string; name: string }[],
+    currentPlaylistId?: string
+  ) => {
+    const shown = playlists.slice(0, MAX_QUICK_REPLY_ITEMS);
+    const current = playlists.find((p) => p.id === currentPlaylistId);
+    const lines = [
+      current ? `目前歌單：${current.name}` : "目前還沒選歌單",
+      "請選擇要加入歌曲的歌單：",
+    ];
+    if (playlists.length > shown.length) {
+      lines.push(`（只顯示前 ${MAX_QUICK_REPLY_ITEMS} 個）`);
+    }
+    return {
+      type: "text",
+      text: lines.join("\n"),
+      quickReply: {
+        items: shown.map((p) => ({
+          type: "action",
+          action: {
+            type: "postback",
+            label: truncate(p.name || "(未命名)", MAX_LABEL_LENGTH),
+            data: new URLSearchParams({
+              action: actionCommands.SELECT_PLAYLIST,
+              id: p.id,
+            }).toString(),
+            displayText: `選擇歌單：${truncate(p.name || "(未命名)", 100)}`,
+          },
+        })),
+      },
+    };
+  },
+};
+
+// LINE 限制：quick reply 最多 13 個按鈕，按鈕文字最多 20 字
+const MAX_QUICK_REPLY_ITEMS = 13;
+const MAX_LABEL_LENGTH = 20;
+
+const truncate = (text: string, max: number): string => {
+  const chars = Array.from(text);
+  return chars.length > max ? chars.slice(0, max - 1).join("") + "…" : text;
 };
 
 export default utils;
