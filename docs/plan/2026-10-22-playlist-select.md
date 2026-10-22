@@ -2,7 +2,7 @@
 
 - 日期：2026-10-22
 - Branch：`claude/playlist-select`
-- PR：#<number>（開 PR 後補上）
+- PR：#3
 
 ## 背景
 
@@ -22,22 +22,45 @@
 
 - `src/services/spotify/playlist.ts`
   - 新增 `listWritablePlaylists`：呼叫 `GET /v1/me/playlists?limit=50`，只留 owner 是自己或 `collaborative` 的歌單
-  - 新增 `selectPlaylist`：確認 id 在可寫入清單裡才存進 MongoDB，並回傳歌單名稱
+  - 新增 `selectPlaylist`：先檢查 id 格式，再用 `GET /v1/playlists/{id}` 查這一個歌單，確認可寫入才存進 MongoDB
+  - MongoDB 沒有 Spotify user id 時（登入時抓 profile 失敗）會補抓一次
+  - Spotify 回 401 時改成提示輸入 `login` 重新登入，不直接顯示英文錯誤
   - `addTrackToPlaylist` 沒選歌單時的錯誤訊息改成提示輸入「歌單」
-- `src/utils/lineUtils.ts`：新增 `generatePlaylistQuickReply`，處理 13 個按鈕上限、20 字截斷（以字元計，emoji 不會被切壞）、空白歌單名稱
+- `src/utils/lineUtils.ts`
+  - 新增 `generatePlaylistQuickReply`：13 個按鈕上限、按鈕文字最多 20 字、空白歌單名稱、目前歌單不在清單中的提示
+  - 截斷以完整字形為單位，且 UTF-16 長度也不超過 20，不會切開組合 emoji（例如 👨‍👩‍👧、🇹🇼）
+  - `replayMessage` 在 LINE 拒收訊息時記錄狀態碼和回應內容（原本完全沒有 log）
 - `src/utils/lineType.ts`：新增 `SELECT_PLAYLIST` action
-- `src/route/webhook.ts`：文字指令「歌單」/`playlists`/`playlist`，以及 `SELECT_PLAYLIST` postback
+- `src/route/webhook.ts`
+  - 文字指令「歌單」/`playlists`/`playlist`，以及 `SELECT_PLAYLIST` postback
+  - 每個事件各自攔錯誤：出錯時回覆「發生錯誤，請稍後再試」並記 log，同一批的其他事件照常處理（原本任何一個事件出錯，整個 webhook 回 500）
+- `src/route/spotify.ts`：登入權限加上 `playlist-read-collaborative`，並把不存在的 `playlist-modify` 改成 `playlist-modify-public`
 
-和計畫不同的地方：無。
+和計畫不同的地方（code review 後調整）：
 
-驗證：`npx tsc --noEmit` 通過；另外用假的 MongoDB / Spotify 回應跑了 8 項行為檢查（過濾規則、未選歌單提示、拒絕非自己的歌單、Spotify 錯誤、未連結帳號、按鈕數量與文字截斷、postback 資料能正確解析、空白名稱），全部通過。尚未在真的 LINE / Spotify 上實測。
+- 選歌單原本是重抓整份清單再比對 id，改成直接查單一歌單，也能選到前 50 個以外的歌單
+- 計畫寫「不需要新的 Spotify 權限」是錯的：沒有 `playlist-read-collaborative`，Spotify 不會回傳別人建立的共編歌單；沒有 `playlist-modify-public`，加歌到自己的公開歌單會被拒絕
+- 補上上面列的錯誤處理（補抓 user id、401 提示重新登入、事件錯誤隔離、LINE 拒收時記 log）
 
-限制：只讀前 50 個歌單，超過 50 個的使用者看不到後面的歌單。
+驗證：
+
+- `npx tsc --noEmit` 通過
+- 用假的 MongoDB / Spotify 回應跑 11 項行為檢查，全部通過：過濾規則、未選歌單提示、拒絕非自己的歌單、用 id 選前 50 個以外的歌單（只發一次請求）、格式錯誤的 id 不發請求、404、401 提示重新登入、補抓 user id、補抓失敗、按鈕數量與截斷（含組合 emoji、中文）、目前歌單不在清單中
+- 用 Fastify 送一批簽章正確的 webhook：第一個事件讓 Spotify 請求丟出例外，回應仍是 200、使用者收到錯誤提示、第二個事件照常處理
+- 尚未在真的 LINE / Spotify 上實測
+
+限制：清單只列前 50 個歌單（但可以選到之後的歌單，例如從其他地方取得的 id）。
 
 ## 影響與注意事項
 
-- 輸入「歌單」或 `playlists` 會被當成指令，不會拿去搜尋歌曲
-- 不需要新的環境變數或 Spotify 權限（登入時已經要求 `playlist-read-private`）
+- 輸入「歌單」、`playlists`、`playlist`（不分大小寫）會被當成指令，不會拿去搜尋歌曲
+- 登入權限有變：已登入的使用者要重新輸入 `login` 授權一次，才看得到別人建立的共編歌單、才能加歌到自己的公開歌單。沒重新授權的話，自己的私人歌單照常可用
+- 不需要新的環境變數
+
+## code review 中不處理的項目
+
+- 「有兩個列歌單的函式」：舊的 `listPlaylists` 只給 `/playlist/playlists` 這個測試用 HTTP route 使用，合併會改到那個 route 的回傳內容，不在這個 PR 處理
+- 「同一份 MongoDB 資料被讀好幾次」：這次只把讀目前歌單改成跟 Spotify 請求並行；改成整份資料只讀一次要動到 `httpUtils` 和所有 service，另外處理
 
 ## 發現但不在這個 PR 處理
 

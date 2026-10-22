@@ -58,13 +58,24 @@ const webhook = (
         events.map(async (event) => {
           const lineUserId = _get(event, "source.userId");
           if (!lineUserId) return;
-          switch (event.type) {
-            case "message":
-              return await handleMessageEvent(event, lineUserId);
-            case "postback":
-              return await handlePostbackEvent(event, lineUserId);
-            default:
-              return;
+          try {
+            switch (event.type) {
+              case "message":
+                return await handleMessageEvent(event, lineUserId);
+              case "postback":
+                return await handlePostbackEvent(event, lineUserId);
+              default:
+                return;
+            }
+          } catch (error) {
+            request.log.error(error, "Failed to handle LINE event");
+            const replyToken = _get(event, "replyToken");
+            if (replyToken) {
+              await lineUtils.replayMessage(replyToken, {
+                type: "text",
+                text: "發生錯誤，請稍後再試",
+              });
+            }
           }
         })
       );
@@ -190,7 +201,10 @@ const replyWithPlaylistChoices = async (
   replyToken: string,
   lineUserId: string
 ) => {
-  const result = await listWritablePlaylists(lineUserId);
+  const [result, currentPlaylistId] = await Promise.all([
+    listWritablePlaylists(lineUserId),
+    mongoDbUtils.getPlaylistId(lineUserId),
+  ]);
   if (!result.ok) {
     return await lineUtils.replayMessage(replyToken, {
       type: "text",
@@ -203,7 +217,6 @@ const replyWithPlaylistChoices = async (
       text: "你還沒有可以加歌的歌單，請先到 Spotify 建立一個歌單，再輸入「歌單」選擇。",
     });
   }
-  const currentPlaylistId = await mongoDbUtils.getPlaylistId(lineUserId);
   return await lineUtils.replayMessage(
     replyToken,
     lineUtils.generatePlaylistQuickReply(result.playlists, currentPlaylistId)
