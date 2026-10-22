@@ -65,7 +65,7 @@ const spotify = (
       params.append("redirect_uri", `${callbackLink}`);
       params.append(
         "scope",
-        "user-read-private user-read-playback-state user-modify-playback-state playlist-read-private playlist-modify playlist-modify-private"
+        "user-read-private user-read-playback-state user-modify-playback-state playlist-read-private playlist-read-collaborative playlist-modify-public playlist-modify-private"
       );
       params.append("code_challenge_method", "S256");
       params.append("code_challenge", codeChallenge);
