@@ -1,13 +1,8 @@
 # 改動紀錄 (docs/plan)
 
-每個 PR 一份紀錄，檔名 `YYYY-MM-DD-<topic>.md`。新紀錄加在索引最上面。
+每個 PR 一份紀錄，檔名 `YYYY-MM-DD-<topic>.md`，跟程式碼放在同一個 PR。
 
-## 索引
-
-| 日期 | 主題 | PR | 狀態 |
-|---|---|---|---|
-| 2026-10-22 | [開發流程規範：worktree / branch / PR + docs/plan](2026-10-22-workflow-conventions.md) | #2 | 進行中 |
-| 2026-10-22 | [程式碼健檢：bug、安全性、多用戶 schema](2026-10-22-code-health-fixes.md) | #1 | 已 merge |
+檔名開頭是日期，照檔名排序就是時間順序，所以不另外維護索引（多個 PR 同時開時，共用的索引一定會衝突）。紀錄也不寫狀態，PR 是否 merge 看 GitHub 上的 PR 頁面。
 
 ## 範本
 
@@ -16,8 +11,7 @@
 
 - 日期：YYYY-MM-DD
 - Branch：`<branch>`
-- PR：#<number>
-- 狀態：計畫中 / 進行中 / 已 merge / 已放棄
+- PR：#<number>（開 PR 後補上）
 
 ## 背景
 為什麼要做這件事。
