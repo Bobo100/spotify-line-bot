@@ -11,7 +11,7 @@ const LINE_HEADER = {
 const utils = {
   replayMessage: async (replyToken: string, message: any) => {
     try {
-      await fetch(`${process.env.LINE_MESSAGING_API}/reply`, {
+      const response = await fetch(`${process.env.LINE_MESSAGING_API}/reply`, {
         method: "POST",
         headers: LINE_HEADER,
         body: JSON.stringify({
@@ -19,6 +19,11 @@ const utils = {
           messages: [message],
         }),
       });
+      if (!response.ok) {
+        console.error(
+          `LINE rejected reply (${response.status}): ${await response.text()}`
+        );
+      }
     } catch (error) {
       console.error(`Delivery to LINE failed (${error})`);
     }
@@ -259,6 +264,63 @@ const utils = {
       data: `action=${payload.action}&next=${payload.next}`,
     };
   },
+  generatePlaylistQuickReply: (
+    playlists: { id: string; name: string }[],
+    currentPlaylistId?: string
+  ) => {
+    const shown = playlists.slice(0, MAX_QUICK_REPLY_ITEMS);
+    const current = playlists.find((p) => p.id === currentPlaylistId);
+    const currentLine = current
+      ? `目前歌單：${current.name}`
+      : currentPlaylistId
+      ? "目前已選歌單（不在下方清單中）"
+      : "目前還沒選歌單";
+    const lines = [
+      currentLine,
+      "請選擇要加入歌曲的歌單：",
+    ];
+    if (playlists.length > shown.length) {
+      lines.push(`（只顯示前 ${MAX_QUICK_REPLY_ITEMS} 個）`);
+    }
+    return {
+      type: "text",
+      text: lines.join("\n"),
+      quickReply: {
+        items: shown.map((p) => ({
+          type: "action",
+          action: {
+            type: "postback",
+            label: truncate(p.name || "(未命名)", MAX_LABEL_LENGTH),
+            data: new URLSearchParams({
+              action: actionCommands.SELECT_PLAYLIST,
+              id: p.id,
+            }).toString(),
+            displayText: `選擇歌單：${truncate(p.name || "(未命名)", 100)}`,
+          },
+        })),
+      },
+    };
+  },
+};
+
+// LINE 限制：quick reply 最多 13 個按鈕，按鈕文字最多 20 字
+const MAX_QUICK_REPLY_ITEMS = 13;
+const MAX_LABEL_LENGTH = 20;
+
+// Intl.Segmenter 不在 es2017 的型別定義裡，但 Node 24 有提供
+const segmenter = new (Intl as any).Segmenter(undefined, {
+  granularity: "grapheme",
+});
+
+// 不確定 LINE 用字形還是 UTF-16 計算長度，兩種都控制在 max 以內，且不切開組合 emoji
+const truncate = (text: string, max: number): string => {
+  if (text.length <= max) return text;
+  let result = "";
+  for (const { segment } of segmenter.segment(text)) {
+    if (result.length + segment.length + 1 > max) break;
+    result += segment;
+  }
+  return result + "…";
 };
 
 export default utils;

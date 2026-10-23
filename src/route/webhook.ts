@@ -17,7 +17,11 @@ import {
 } from "../utils/lineType";
 import { routeLink, authLink } from "../utils/routeLink";
 import { searchTracks, fetchSpotifyUrl } from "../services/spotify/search";
-import { addTrackToPlaylist } from "../services/spotify/playlist";
+import {
+  addTrackToPlaylist,
+  listWritablePlaylists,
+  selectPlaylist,
+} from "../services/spotify/playlist";
 import { createLoginToken } from "../services/spotify/loginToken";
 
 type WebhookRequest = FastifyRequest<{
@@ -54,13 +58,24 @@ const webhook = (
         events.map(async (event) => {
           const lineUserId = _get(event, "source.userId");
           if (!lineUserId) return;
-          switch (event.type) {
-            case "message":
-              return await handleMessageEvent(event, lineUserId);
-            case "postback":
-              return await handlePostbackEvent(event, lineUserId);
-            default:
-              return;
+          try {
+            switch (event.type) {
+              case "message":
+                return await handleMessageEvent(event, lineUserId);
+              case "postback":
+                return await handlePostbackEvent(event, lineUserId);
+              default:
+                return;
+            }
+          } catch (error) {
+            request.log.error(error, "Failed to handle LINE event");
+            const replyToken = _get(event, "replyToken");
+            if (replyToken) {
+              await lineUtils.replayMessage(replyToken, {
+                type: "text",
+                text: "發生錯誤，請稍後再試",
+              });
+            }
           }
         })
       );
@@ -105,9 +120,18 @@ const handlePostbackEvent = async (
   }
 
   const searchParams = new URLSearchParams(data);
-  const { action, uri, position, next, type, market, limit, offset } =
+  const { action, uri, position, next, type, market, limit, offset, id } =
     Object.fromEntries(searchParams.entries());
   switch (action) {
+    case actionCommands.SELECT_PLAYLIST: {
+      const result = await selectPlaylist(lineUserId, id);
+      return await lineUtils.replayMessage(replyToken, {
+        type: "text",
+        text: result.ok
+          ? `已設定歌單：${result.name}`
+          : `設定失敗：${result.error ?? ""}`,
+      });
+    }
     case actionCommands.ADD_TRACK: {
       const result = await addTrackToPlaylist(lineUserId, uri, position);
       return await lineUtils.replayMessage(replyToken, {
@@ -157,6 +181,10 @@ const handleTextEventMessage = async (
     });
   }
 
+  if (PLAYLIST_COMMANDS.includes(text.trim().toLowerCase())) {
+    return await replyWithPlaylistChoices(replyToken, lineUserId);
+  }
+
   try {
     const searchData = await searchTracks(lineUserId, text);
     if (_get(searchData, "error.status")) return null;
@@ -165,6 +193,34 @@ const handleTextEventMessage = async (
     console.log(error);
     return null;
   }
+};
+
+const PLAYLIST_COMMANDS = ["歌單", "playlists", "playlist"];
+
+const replyWithPlaylistChoices = async (
+  replyToken: string,
+  lineUserId: string
+) => {
+  const [result, currentPlaylistId] = await Promise.all([
+    listWritablePlaylists(lineUserId),
+    mongoDbUtils.getPlaylistId(lineUserId),
+  ]);
+  if (!result.ok) {
+    return await lineUtils.replayMessage(replyToken, {
+      type: "text",
+      text: `讀取歌單失敗：${result.error ?? ""}`,
+    });
+  }
+  if (result.playlists.length === 0) {
+    return await lineUtils.replayMessage(replyToken, {
+      type: "text",
+      text: "你還沒有可以加歌的歌單，請先到 Spotify 建立一個歌單，再輸入「歌單」選擇。",
+    });
+  }
+  return await lineUtils.replayMessage(
+    replyToken,
+    lineUtils.generatePlaylistQuickReply(result.playlists, currentPlaylistId)
+  );
 };
 
 const replyWithSearchResult = async (replyToken: string, searchData: any) => {
