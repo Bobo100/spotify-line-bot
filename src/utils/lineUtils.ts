@@ -248,10 +248,17 @@ const utils = {
     title: string,
     payload: any
   ): { [key: string]: string } => {
+    const params = new URLSearchParams({
+      action: payload.action,
+      uri: payload.uri,
+    });
+    if (payload.position !== null && payload.position !== undefined) {
+      params.set("position", String(payload.position));
+    }
     return {
       type: "postback",
       label: title,
-      data: `action=${payload.action}&uri=${payload.uri}&position=${payload.position}`,
+      data: params.toString(),
     };
   },
   generateNextPagePostbackButton: (

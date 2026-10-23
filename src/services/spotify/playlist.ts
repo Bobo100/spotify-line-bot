@@ -92,6 +92,15 @@ export const selectPlaylist = async (
 
 export const NO_PLAYLIST_ERROR = "尚未選擇歌單，請輸入「歌單」選擇要加入的歌單";
 
+// 舊訊息的按鈕會送出字串 "null"，無法解析的值一律當成加到最後一首
+const parsePosition = (position?: number | string): number | undefined => {
+  if (position === undefined || position === null || position === "") {
+    return undefined;
+  }
+  const value = Number(position);
+  return Number.isInteger(value) && value >= 0 ? value : undefined;
+};
+
 export const addTrackToPlaylist = async (
   lineUserId: string,
   uri: string,
@@ -101,9 +110,10 @@ export const addTrackToPlaylist = async (
   if (!playlist_id) {
     return { ok: false, error: NO_PLAYLIST_ERROR };
   }
-  const body: { uris: string[]; position?: number | string } = { uris: [uri] };
-  if (position !== undefined && position !== null && position !== "") {
-    body.position = position;
+  const body: { uris: string[]; position?: number } = { uris: [uri] };
+  const parsedPosition = parsePosition(position);
+  if (parsedPosition !== undefined) {
+    body.position = parsedPosition;
   }
   const data = await httpUtils.httpFetchPostWithToken({
     lineUserId,
