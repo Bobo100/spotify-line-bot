@@ -28,5 +28,10 @@
   },
   "devDependencies": {
     "tap": "^16.1.0"
+  },
+  "resolutions": {
+    "@vercel/node/undici": "5.29.0",
+    "@vercel/node/path-to-regexp": "6.3.0",
+    "**/@vercel/static-config/ajv": "8.20.0"
   }
 }
