@@ -1,0 +1,13 @@
+{
+  "env": {
+    "GIT_AUTHOR_NAME": "Bobo100",
+    "GIT_AUTHOR_EMAIL": "w150lione@gmail.com",
+    "GIT_COMMITTER_NAME": "Bobo100",
+    "GIT_COMMITTER_EMAIL": "w150lione@gmail.com"
+  },
+  "attribution": {
+    "commit": "",
+    "pr": "",
+    "sessionUrl": false
+  }
+}
