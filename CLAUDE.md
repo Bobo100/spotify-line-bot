@@ -28,6 +28,14 @@ LINE Bot 控制 Spotify 的 side project：Fastify (serverless on Vercel) + Mong
 - 紀錄不寫狀態欄位；PR 是否 merge 看 GitHub 上的 PR 頁面。
 - 實作途中計畫改變時，更新同一份紀錄，不另開新檔。
 
+## PR 格式
+
+- 標題和 commit 一樣：`<type>: <中文摘要>`。
+- 描述照 `.github/pull_request_template.md` 的段落，順序和標題都不改：`摘要`、`改動內容`、`影響與注意事項`、`測試`、`紀錄`。
+- 全部用中文；沒有內容的段落寫「無」，不要刪掉。
+- `測試` 用 checklist：做過的打勾，還沒做的（例如在 LINE 上實測）留空。
+- `紀錄` 放這個 PR 的 `docs/plan/` 檔案路徑。
+
 ## Commit 訊息
 
 - 格式：`<type>: <中文摘要>`，type 用 `feat` / `fix` / `refactor` / `security` / `chore` / `docs`。
