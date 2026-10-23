@@ -2,7 +2,7 @@
 
 - 日期：2026-10-24
 - Branch：`chore/deps-security-2026-10`
-- PR：#（開 PR 後補上）
+- PR：#6
 
 ## 背景
 
