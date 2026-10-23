@@ -83,8 +83,11 @@ BREAKING CHANGE: <有破壞性變更時才寫>
 - 補 PR 編號的 commit 固定寫成：`docs(plan): 補上 <topic> 紀錄的 PR 編號`。
 - 有破壞性變更時，type 後面加 `!`（例如 `feat(db)!:`），並在最後一段寫 `BREAKING CHANGE:` 說明。
 - 摘要不加句號，盡量在 50 字以內；內文每行約 72 字元換行。
-- 2026-10-23 以前的 commit（`[what] ...`、`security: ...` 等）保留原樣，不重寫歷史。
-- commit 不能出現其他貢獻者：不加 `Co-Authored-By` trailer，作者與 committer 都用 `Bobo100 <w150lione@gmail.com>`（用 `GIT_AUTHOR_*` / `GIT_COMMITTER_*` 環境變數指定，不改 git config）。
+- 歷史：2026-10-23 已改寫 PR #1～#3 的 commit（作者改成 `Bobo100`、訊息改成這個格式）；更早的 `[what] ...` commit 保留原樣。之後不再改寫 `main` 的歷史。
+- commit 不能出現其他貢獻者：不加 `Co-Authored-By` trailer，作者與 committer 都用 `Bobo100 <w150lione@gmail.com>`。
+  - `.claude/settings.json` 已經設好 `GIT_AUTHOR_*` / `GIT_COMMITTER_*` 環境變數，Claude 的 session 會自動套用
+  - commit 前用 `git log -1 --format='%an <%ae> / %cn <%ce>'` 確認；不對的話在指令前手動加上這些環境變數，不改 git config
+  - 雲端環境預設的 `noreply@anthropic.com` 在 GitHub 上對應到 `claude` 這個帳號，用了就會被列成 contributor
 - commit 訊息和 PR 描述都不加任何 Claude 相關標記（例如 `Claude-Session:`、「Generated with Claude Code」）。
 
 ## 常用指令

@@ -10,17 +10,19 @@
 
 ## 實際改動（依 commit 順序）
 
-1. **fix**：`httpUtils` 遇到 401 重試後沒有 `return`，呼叫端拿到 `undefined`
-2. **fix**：webhook 只處理 `events[0]`，改成處理所有 events
-3. **security**：webhook 簽章比對改用 `crypto.timingSafeEqual`
-4. **fix**：`/playlist/add` 從 GET 改成 POST + JSON body
-5. **security**：`/spotify/refresh` 加上 secret header（後來在第 9 項整個移除）
-6. **refactor**：`playlist_id` 改從 MongoDB 讀，不再寫死
-7. **security**：OAuth 的 `code_verifier` 改存簽章 cookie，並加上 `state` 防 CSRF
+commit 的作者和訊息已在 2026-10-23 改寫，下面的 type 跟改寫後的 commit 一致（見 `2026-10-23-pr-template.md`）。
+
+1. **fix(auth)**：`httpUtils` 遇到 401 重試後沒有 `return`，呼叫端拿到 `undefined`
+2. **fix(webhook)**：webhook 只處理 `events[0]`，改成處理所有 events
+3. **fix(webhook)**：webhook 簽章比對改用 `crypto.timingSafeEqual`
+4. **fix(playlist)**：`/playlist/add` 從 GET 改成 POST + JSON body
+5. **fix(auth)**：`/spotify/refresh` 加上 secret header（後來在第 9 項整個移除）
+6. **refactor(playlist)**：`playlist_id` 改從 MongoDB 讀，不再寫死
+7. **fix(auth)**：OAuth 的 `code_verifier` 改存簽章 cookie，並加上 `state` 防 CSRF
 8. **chore**：`fastify`、`dotenv` 移到 dependencies；cookie secret 改讀 `COOKIE_SECRET`
 9. **refactor**：新增 `src/services/spotify/`，webhook 直接呼叫 function，不再自己打自己的 HTTP；移除 `/spotify/refresh` route
-10. **feat**：MongoDB 改成單一 `users` collection，用 LINE userId 當 key；新增 LINE `login` 指令產生個人化登入連結
-11. **chore**：`engines.node` 鎖 24.x，`@types/node` 升到 24
+10. **feat(db)!**：MongoDB 改成單一 `users` collection，用 LINE userId 當 key；新增 LINE `login` 指令產生個人化登入連結
+11. **build**：`engines.node` 鎖 24.x，`@types/node` 升到 24
 
 ## 影響與注意事項
 
