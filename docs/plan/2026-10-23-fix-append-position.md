@@ -2,7 +2,7 @@
 
 - 日期：2026-10-23
 - Branch：`claude/fix-append-position`
-- PR：#<number>（開 PR 後補上）
+- PR：#5
 
 ## 背景
 
