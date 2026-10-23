@@ -30,7 +30,7 @@ LINE Bot 控制 Spotify 的 side project：Fastify (serverless on Vercel) + Mong
 
 ## PR 格式
 
-- 標題和 commit 一樣：`<type>: <中文摘要>`。
+- 標題格式和 commit 標題一樣（見下方「Commit 訊息」）。
 - 描述照 `.github/pull_request_template.md` 的段落，順序和標題都不改：`摘要`、`改動內容`、`影響與注意事項`、`測試`、`紀錄`。
 - 全部用中文；沒有內容的段落寫「無」，不要刪掉。
 - `測試` 用 checklist：做過的打勾，還沒做的（例如在 LINE 上實測）留空。
@@ -38,8 +38,31 @@ LINE Bot 控制 Spotify 的 side project：Fastify (serverless on Vercel) + Mong
 
 ## Commit 訊息
 
-- 格式：`<type>: <中文摘要>`，type 用 `feat` / `fix` / `refactor` / `security` / `chore` / `docs`。
-- 內文寫「為什麼改」，不只寫「改了什麼」。
+採用 [Conventional Commits 1.0](https://www.conventionalcommits.org/zh-hant/v1.0.0/)：
+
+```
+<type>(<scope>): <中文摘要>
+
+<內文：為什麼改，不只寫改了什麼>
+
+BREAKING CHANGE: <有破壞性變更時才寫>
+```
+
+- `type`：
+  - `feat`：新功能
+  - `fix`：修 bug（安全性修正也用 `fix`，在內文說明）
+  - `docs`：只改文件
+  - `refactor`：不改變行為的重構
+  - `perf`：效能改善
+  - `test`：測試
+  - `build`：相依套件、建置設定（例如 `package.json`、`tsconfig.json`）
+  - `ci`：CI 設定
+  - `chore`：其他雜項
+  - `revert`：還原先前的 commit
+- `scope` 可省略，用模組名稱，例如 `webhook`、`auth`、`playlist`、`line`。
+- 有破壞性變更時，type 後面加 `!`（例如 `feat(db)!:`），並在最後一段寫 `BREAKING CHANGE:` 說明。
+- 摘要不加句號，盡量在 50 字以內；內文每行約 72 字元換行。
+- 2026-10-23 以前的 commit（`[what] ...`、`security: ...` 等）保留原樣，不重寫歷史。
 - commit 不能出現其他貢獻者：不加 `Co-Authored-By` trailer，作者與 committer 都用 `Bobo100 <w150lione@gmail.com>`（用 `GIT_AUTHOR_*` / `GIT_COMMITTER_*` 環境變數指定，不改 git config）。
 - commit 訊息和 PR 描述都不加任何 Claude 相關標記（例如 `Claude-Session:`、「Generated with Claude Code」）。
 
