@@ -28,6 +28,19 @@ LINE Bot 控制 Spotify 的 side project：Fastify (serverless on Vercel) + Mong
 - 紀錄不寫狀態欄位；PR 是否 merge 看 GitHub 上的 PR 頁面。
 - 實作途中計畫改變時，更新同一份紀錄，不另開新檔。
 
+### 3. 每個 PR 的完整流程
+
+每次都照這個順序，不跳步驟：
+
+1. 開 worktree 和 branch，先在 `docs/plan/` 寫好紀錄的「背景」和「計畫」
+2. 實作，並驗證（至少 `npx tsc --noEmit`，能測的行為要實際跑過）
+3. 把紀錄的計畫打勾、補上「實際改動」和驗證結果，跟程式碼一起 commit
+4. 開 PR（格式見「PR 格式」），再用一個 commit 補上紀錄裡的 PR 編號
+5. 跑 code review 和對抗性驗證；逐項驗證後修正，沒修的寫明原因
+6. 修正後**一定要回頭更新紀錄**（「和計畫不同的地方」、「code review 中不處理的項目」）和 PR 描述，讓兩者跟最終程式碼一致
+7. merge：一律用 merge commit（不用 squash / rebase），訊息用 GitHub 預設
+8. 收尾：移除 worktree、刪除本機 branch、主 checkout 的 `main` 更新到最新
+
 ## PR 格式
 
 - 標題格式和 commit 標題一樣（見下方「Commit 訊息」）。
@@ -59,7 +72,15 @@ BREAKING CHANGE: <有破壞性變更時才寫>
   - `ci`：CI 設定
   - `chore`：其他雜項
   - `revert`：還原先前的 commit
-- `scope` 可省略，用模組名稱，例如 `webhook`、`auth`、`playlist`、`line`。
+- `scope` 依這次改動主要影響的功能，從下面選一個，不自創：
+  - `auth`：登入、token
+  - `search`：搜尋
+  - `playlist`：歌單、加歌
+  - `webhook`：LINE webhook 的分派與指令
+  - `db`：MongoDB 資料結構
+  - `plan`：只改 `docs/plan/` 的紀錄
+  - 只改流程文件（`CLAUDE.md`、`.github/` 範本）或同時影響多個功能：不寫 scope
+- 補 PR 編號的 commit 固定寫成：`docs(plan): 補上 <topic> 紀錄的 PR 編號`。
 - 有破壞性變更時，type 後面加 `!`（例如 `feat(db)!:`），並在最後一段寫 `BREAKING CHANGE:` 說明。
 - 摘要不加句號，盡量在 50 字以內；內文每行約 72 字元換行。
 - 2026-10-23 以前的 commit（`[what] ...`、`security: ...` 等）保留原樣，不重寫歷史。
