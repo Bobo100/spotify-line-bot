@@ -92,18 +92,41 @@ export const selectPlaylist = async (
 
 export const NO_PLAYLIST_ERROR = "尚未選擇歌單，請輸入「歌單」選擇要加入的歌單";
 
+const POSITION_ERROR = "position 必須是 0 以上的整數";
+
+// 沒給 position 代表加到最後一首；舊訊息的按鈕會送出字串 "null"，也當成沒給
+const parsePosition = (
+  position?: number | string
+): { valid: true; value?: number } | { valid: false } => {
+  if (position === undefined || position === "" || position === "null") {
+    return { valid: true };
+  }
+  if (typeof position === "number") {
+    return Number.isSafeInteger(position) && position >= 0
+      ? { valid: true, value: position }
+      : { valid: false };
+  }
+  return /^\d+$/.test(position)
+    ? { valid: true, value: Number(position) }
+    : { valid: false };
+};
+
 export const addTrackToPlaylist = async (
   lineUserId: string,
   uri: string,
   position?: number | string
 ): Promise<{ ok: boolean; data?: any; error?: string }> => {
+  const parsedPosition = parsePosition(position);
+  if (!parsedPosition.valid) {
+    return { ok: false, error: POSITION_ERROR };
+  }
   const playlist_id = await mongoDbUtils.getPlaylistId(lineUserId);
   if (!playlist_id) {
     return { ok: false, error: NO_PLAYLIST_ERROR };
   }
-  const body: { uris: string[]; position?: number | string } = { uris: [uri] };
-  if (position !== undefined && position !== null && position !== "") {
-    body.position = position;
+  const body: { uris: string[]; position?: number } = { uris: [uri] };
+  if (parsedPosition.value !== undefined) {
+    body.position = parsedPosition.value;
   }
   const data = await httpUtils.httpFetchPostWithToken({
     lineUserId,
