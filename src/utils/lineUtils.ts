@@ -141,7 +141,7 @@ const utils = {
               action: utils.generateAddTrackPostbackButton("INSERT", {
                 action: actionCommands.ADD_TRACK,
                 uri: data.uri,
-                position: "0",
+                position: 0,
               }),
               style: "primary",
               gravity: "bottom",
@@ -164,7 +164,6 @@ const utils = {
               action: utils.generateAddTrackPostbackButton("APPEND", {
                 action: actionCommands.ADD_TRACK,
                 uri: data.uri,
-                position: null,
               }),
               style: "primary",
               gravity: "bottom",
@@ -225,34 +224,16 @@ const utils = {
     }
     return template;
   },
-  /**
-   * 產生postback button
-   * @param title
-   * @param payload
-   * @returns
-   * {
-   *   "type": "postback",
-   *   "label": "Buy",
-   *   "data": "action=buy&itemid=111",
-   *   "displayText": "Buy",
-   *   "inputOption": "openKeyboard",
-   *   "fillInText": "---\nName: \nPhone: \nBirthday: \n---"
-   * }
-   * payload: {
-   *   action: actionCommands.ADD_TRACK,
-   *   uri: data.uri,
-   * }
-   * 要轉換成action=actionCommands.ADD_TRACK&uri=data.uri
-   */
+  // 產生加入歌單的 postback 按鈕；position 省略代表加到最後一首
   generateAddTrackPostbackButton: (
     title: string,
-    payload: any
+    payload: { action: string; uri: string; position?: number }
   ): { [key: string]: string } => {
     const params = new URLSearchParams({
       action: payload.action,
       uri: payload.uri,
     });
-    if (payload.position !== null && payload.position !== undefined) {
+    if (payload.position !== undefined) {
       params.set("position", String(payload.position));
     }
     return {
