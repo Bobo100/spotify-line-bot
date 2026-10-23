@@ -25,13 +25,29 @@
 - `docs/plan/2026-10-22-code-health-fixes.md`：補記 PR #1
 - `.gitignore`：加入 `/.worktrees`
 
-和計畫不同的地方（code review 後調整）：
+## 和計畫不同的地方
+
+code review 後調整：
 
 - 原本 `docs/plan/README.md` 有一張共用索引表，每個 PR 都要在最上面加一行。多個 PR 同時開時這行一定會衝突，所以拿掉索引，改成靠檔名日期排序。
 - 原本紀錄有「狀態」欄位，但紀錄跟程式碼在同一個 PR，merge 後沒辦法再改成「已 merge」，所以拿掉，狀態看 GitHub。
 - Branch 命名改成：手動開的用 `<type>/<topic>`，Claude 開的用 `claude/<topic>`，跟這個 PR 的 branch 名稱一致。
 - 收尾步驟補上刪除本機 branch。
 
+## 驗證
+
+- 在主 checkout 跑 `tsc --listFilesOnly`，確認 tsc 不會讀到 `.worktrees/` 裡的檔案（TypeScript 預設跳過 `.` 開頭的資料夾）
+- code review + 對抗性驗證：8 項中 6 項已修，2 項驗證為誤報
+
 ## 影響與注意事項
 
 只動文件和 `.gitignore`，不影響程式行為。
+
+## code review 中不處理的項目
+
+- 「tsc 會把 `.worktrees/` 裡的程式也一起檢查」：誤報，實測 tsc 只讀到主線自己的檔案
+- 「PR 編號是猜的」：誤報，遠端確實有 PR #2
+
+## 後續待辦
+
+無

@@ -8,9 +8,13 @@
 
 檢查整個專案時發現幾個會出 bug 的地方（token 過期就壞、Vercel 上登入流程不穩），還有一些安全性與架構問題。
 
-## 實際改動（依 commit 順序）
+## 計畫
 
-commit 的作者和訊息已在 2026-10-23 改寫，下面的 type 跟改寫後的 commit 一致（見 `2026-10-23-pr-template.md`）。
+無（這份紀錄是事後補記，當時沒有事前寫計畫）
+
+## 實際改動
+
+依 commit 順序。commit 的作者和訊息已在 2026-10-23 改寫，下面的 type 跟改寫後的 commit 一致（見 `2026-10-23-pr-template.md`）。
 
 1. **fix(auth)**：`httpUtils` 遇到 401 重試後沒有 `return`，呼叫端拿到 `undefined`
 2. **fix(webhook)**：webhook 只處理 `events[0]`，改成處理所有 events
@@ -24,6 +28,17 @@ commit 的作者和訊息已在 2026-10-23 改寫，下面的 type 跟改寫後�
 10. **feat(db)!**：MongoDB 改成單一 `users` collection，用 LINE userId 當 key；新增 LINE `login` 指令產生個人化登入連結
 11. **build**：`engines.node` 鎖 24.x，`@types/node` 升到 24
 
+第 8 項同時改了相依套件和 cookie secret，不只是建置設定，所以用 `chore` 而不是 `build`。
+
+## 和計畫不同的地方
+
+無
+
+## 驗證
+
+- 每個 commit 後都跑 `npx tsc --noEmit`，全部通過
+- 當時沒有在 LINE / Spotify 上實測
+
 ## 影響與注意事項
 
 - **Breaking**：舊的 `token` / `user` / `playlist` collection 不再使用，使用者要在 LINE 輸入 `login` 重新登入
@@ -31,6 +46,10 @@ commit 的作者和訊息已在 2026-10-23 改寫，下面的 type 跟改寫後�
 - 新環境變數：`COOKIE_SECRET`
 - Vercel Project Settings 的 Node.js Version 要設成 24.x
 
-## 已知缺口
+## code review 中不處理的項目
 
-- 還沒有設定 `playlistId` 的入口，`addTrackToPlaylist` 在 MongoDB 沒有資料時會回「playlist_id 尚未設定」
+無（當時沒有跑 code review）
+
+## 後續待辦
+
+- 還沒有設定 `playlistId` 的入口，`addTrackToPlaylist` 在 MongoDB 沒有資料時會回「playlist_id 尚未設定」（已在 PR #3 處理）
