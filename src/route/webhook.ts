@@ -24,6 +24,12 @@ import {
 } from "../services/spotify/playlist";
 import { createLoginToken } from "../services/spotify/loginToken";
 
+declare module "fastify" {
+  interface FastifyRequest {
+    rawBody?: string;
+  }
+}
+
 type WebhookRequest = FastifyRequest<{
   Body: WebhookRequestBody;
 }>;
@@ -33,13 +39,27 @@ const webhook = (
   opts: FastifyServerOptions,
   done: any
 ) => {
+  // LINE 對原始 body 計算簽章，重組後的 JSON 字串可能跟原始的不同，所以先留下原始字串
+  const defaultJsonParser = fastify.getDefaultJsonParser("error", "error");
+  fastify.removeContentTypeParser("application/json");
+  fastify.addContentTypeParser(
+    "application/json",
+    { parseAs: "string" },
+    (request, body, parseDone) => {
+      request.rawBody = body as string;
+      defaultJsonParser(request, body as string, parseDone);
+    }
+  );
+
   fastify.post(
     routeLink.default,
     async (request: WebhookRequest, reply: FastifyReply) => {
-      const r = JSON.stringify(request.body);
+      if (request.rawBody === undefined) {
+        return reply.status(401).send("Unauthorized");
+      }
       const expected = crypto
         .createHmac("SHA256", process.env.LINE_CHANNEL_SECRET!)
-        .update(r || "")
+        .update(request.rawBody)
         .digest();
       const received = request.headers["x-line-signature"];
       const receivedBuf =
