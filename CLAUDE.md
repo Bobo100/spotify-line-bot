@@ -95,6 +95,7 @@ BREAKING CHANGE: <有破壞性變更時才寫>
 ```bash
 yarn install          # 本機 Node 不是 24 時加 --ignore-engines
 npx tsc --noEmit      # type-check
+npm test              # 跑 test/ 底下的測試（用 npm：yarn run 會因為本機 Node 不是 24 而拒絕執行）
 yarn vercel           # 本機用 vercel dev 跑（需要先全域安裝 Vercel CLI：npm i -g vercel）
 ```
 

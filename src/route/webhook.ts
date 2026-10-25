@@ -4,8 +4,12 @@ import {
   FastifyRequest,
   FastifyReply,
 } from "fastify";
-import crypto from "crypto";
-import { WebhookRequestBody, MessageEvent, PostbackEvent } from "@line/bot-sdk";
+import {
+  WebhookRequestBody,
+  MessageEvent,
+  PostbackEvent,
+  validateSignature,
+} from "@line/bot-sdk";
 import _get from "lodash/get";
 import processUtils from "../utils/processUtils";
 import lineUtils from "../utils/lineUtils";
@@ -28,29 +32,73 @@ type WebhookRequest = FastifyRequest<{
   Body: WebhookRequestBody;
 }>;
 
+const signatureVerified = new WeakSet<FastifyRequest>();
+
+const unauthorizedError = () =>
+  Object.assign(new Error("Unauthorized"), { statusCode: 401 });
+
 const webhook = (
   fastify: FastifyInstance,
   opts: FastifyServerOptions,
   done: any
 ) => {
-  fastify.post(
+  fastify.register(signedWebhookRoute);
+
+  fastify.get(routeLink.default, async (_request, reply) => {
+    return reply.status(200).send("Webhook GET route is active");
+  });
+
+  done();
+};
+
+// 驗簽用的 parser 只放在這個子範圍，只影響 LINE 的 POST webhook
+const signedWebhookRoute = (
+  scope: FastifyInstance,
+  _opts: FastifyServerOptions,
+  scopeDone: any
+) => {
+  // LINE 對原始 bytes 計算簽章，所以要在解析 JSON 之前、用原始 bytes 驗證
+  const defaultJsonParser = scope.getDefaultJsonParser(
+    scope.initialConfig.onProtoPoisoning ?? "error",
+    scope.initialConfig.onConstructorPoisoning ?? "error"
+  );
+  scope.removeAllContentTypeParsers();
+  scope.addContentTypeParser(
+    "application/json",
+    { parseAs: "buffer" },
+    (request, body, parseDone) => {
+      const signature = request.headers["x-line-signature"];
+      if (typeof signature !== "string") {
+        request.log.warn("LINE signature header missing");
+        return parseDone(unauthorizedError(), undefined);
+      }
+      // parser 裡丟出的例外 Fastify 不會接住，會讓整個 process 掛掉，所以要自己轉成錯誤
+      let valid: boolean;
+      try {
+        valid = validateSignature(
+          body as Buffer,
+          process.env.LINE_CHANNEL_SECRET!,
+          signature
+        );
+      } catch (error) {
+        return parseDone(error as Error, undefined);
+      }
+      if (!valid) {
+        request.log.warn("LINE signature mismatch");
+        return parseDone(unauthorizedError(), undefined);
+      }
+      signatureVerified.add(request);
+      defaultJsonParser(request, (body as Buffer).toString("utf8"), parseDone);
+    }
+  );
+
+  scope.post(
     routeLink.default,
     async (request: WebhookRequest, reply: FastifyReply) => {
-      const r = JSON.stringify(request.body);
-      const expected = crypto
-        .createHmac("SHA256", process.env.LINE_CHANNEL_SECRET!)
-        .update(r || "")
-        .digest();
-      const received = request.headers["x-line-signature"];
-      const receivedBuf =
-        typeof received === "string" ? Buffer.from(received, "base64") : null;
-      if (
-        !receivedBuf ||
-        receivedBuf.length !== expected.length ||
-        !crypto.timingSafeEqual(expected, receivedBuf)
-      ) {
-        console.log("Signature mismatch");
-        return reply.status(401).send("Unauthorized");
+      // 沒有 body 的請求不會經過上面的 parser，也就沒有驗過簽章
+      if (!signatureVerified.has(request)) {
+        request.log.warn("LINE signature missing: request has no body");
+        throw unauthorizedError();
       }
 
       const events = request.body.events;
@@ -84,11 +132,7 @@ const webhook = (
     }
   );
 
-  fastify.get(routeLink.default, async (_request, reply) => {
-    return reply.status(200).send("Webhook GET route is active");
-  });
-
-  done();
+  scopeDone();
 };
 
 const buildLoginReplyText = (lineUserId: string): string => {
