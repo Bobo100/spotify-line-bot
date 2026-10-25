@@ -1,7 +1,7 @@
 {
   "name": "myproject",
   "version": "1.0.0",
-  "description": "This project was bootstrapped with Fastify-CLI.",
+  "description": "LINE Bot 控制 Spotify（Fastify on Vercel）",
   "main": "api/serverless.ts",
   "engines": {
     "node": "24.x"
