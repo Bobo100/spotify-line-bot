@@ -2,7 +2,7 @@
 
 - 日期：2026-10-25
 - Branch：`claude/webhook-raw-signature`
-- PR：#<number>（開 PR 後補上）
+- PR：#9
 
 ## 背景
 
