@@ -4,8 +4,12 @@ import {
   FastifyRequest,
   FastifyReply,
 } from "fastify";
-import crypto from "crypto";
-import { WebhookRequestBody, MessageEvent, PostbackEvent } from "@line/bot-sdk";
+import {
+  WebhookRequestBody,
+  MessageEvent,
+  PostbackEvent,
+  validateSignature,
+} from "@line/bot-sdk";
 import _get from "lodash/get";
 import processUtils from "../utils/processUtils";
 import lineUtils from "../utils/lineUtils";
@@ -24,52 +28,53 @@ import {
 } from "../services/spotify/playlist";
 import { createLoginToken } from "../services/spotify/loginToken";
 
-declare module "fastify" {
-  interface FastifyRequest {
-    rawBody?: string;
-  }
-}
-
 type WebhookRequest = FastifyRequest<{
   Body: WebhookRequestBody;
 }>;
+
+const signatureVerified = new WeakSet<FastifyRequest>();
+
+const unauthorizedError = () =>
+  Object.assign(new Error("Unauthorized"), { statusCode: 401 });
 
 const webhook = (
   fastify: FastifyInstance,
   opts: FastifyServerOptions,
   done: any
 ) => {
-  // LINE 對原始 body 計算簽章，重組後的 JSON 字串可能跟原始的不同，所以先留下原始字串
-  const defaultJsonParser = fastify.getDefaultJsonParser("error", "error");
+  // LINE 對原始 bytes 計算簽章，所以要在解析 JSON 之前、用原始 bytes 驗證
+  const defaultJsonParser = fastify.getDefaultJsonParser(
+    fastify.initialConfig.onProtoPoisoning ?? "error",
+    fastify.initialConfig.onConstructorPoisoning ?? "error"
+  );
   fastify.removeContentTypeParser("application/json");
   fastify.addContentTypeParser(
     "application/json",
-    { parseAs: "string" },
+    { parseAs: "buffer" },
     (request, body, parseDone) => {
-      request.rawBody = body as string;
-      defaultJsonParser(request, body as string, parseDone);
+      const signature = request.headers["x-line-signature"];
+      if (
+        typeof signature !== "string" ||
+        !validateSignature(
+          body as Buffer,
+          process.env.LINE_CHANNEL_SECRET!,
+          signature
+        )
+      ) {
+        request.log.warn("LINE signature mismatch");
+        return parseDone(unauthorizedError(), undefined);
+      }
+      signatureVerified.add(request);
+      defaultJsonParser(request, (body as Buffer).toString("utf8"), parseDone);
     }
   );
 
   fastify.post(
     routeLink.default,
     async (request: WebhookRequest, reply: FastifyReply) => {
-      if (request.rawBody === undefined) {
-        return reply.status(401).send("Unauthorized");
-      }
-      const expected = crypto
-        .createHmac("SHA256", process.env.LINE_CHANNEL_SECRET!)
-        .update(request.rawBody)
-        .digest();
-      const received = request.headers["x-line-signature"];
-      const receivedBuf =
-        typeof received === "string" ? Buffer.from(received, "base64") : null;
-      if (
-        !receivedBuf ||
-        receivedBuf.length !== expected.length ||
-        !crypto.timingSafeEqual(expected, receivedBuf)
-      ) {
-        console.log("Signature mismatch");
+      // 沒有 JSON body 的請求不會經過上面的 parser，也就沒有驗過簽章
+      if (!signatureVerified.has(request)) {
+        request.log.warn("LINE signature missing");
         return reply.status(401).send("Unauthorized");
       }
 
