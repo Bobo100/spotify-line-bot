@@ -25,15 +25,19 @@ LINE 是對 webhook 請求的**原始 body** 計算 `x-line-signature`。目前�
 ## 實際改動
 
 - `src/route/webhook.ts`：
-  - 在 webhook 這個 route 範圍內，換掉 `application/json` 的 parser，用原始 bytes（`parseAs: "buffer"`）**先驗簽章、再解析 JSON**：
+  - POST webhook 改放在只包它的子範圍（`signedWebhookRoute`），移除這個範圍內繼承的所有 parser，只留驗簽用的 `application/json` parser；其他 content type 回 415
+  - parser 用原始 bytes（`parseAs: "buffer"`）**先驗簽章、再解析 JSON**：
     - 用 `@line/bot-sdk` 的 `validateSignature`（HMAC-SHA256 + timing-safe 比對），取代原本自己寫的同一段邏輯
-    - 簽章不符：記 log，回 401，不解析 JSON
+    - 沒帶簽章 header、簽章不符：分別記 log，回 401，不解析 JSON
+    - 驗簽時丟出的例外（例如沒設定 `LINE_CHANNEL_SECRET`）轉成錯誤交給 Fastify，回 500
     - 簽章正確：交給 Fastify 內建的 JSON parser（`getDefaultJsonParser`，`__proto__` / `constructor` 防護的設定跟 app 一致）
-  - handler 檢查這個 request 有沒有經過驗簽，沒有就記 log、回 401。沒有 body 或 `text/plain` 這類請求不會經過上面的 parser，靠這道檢查擋下
+  - handler 檢查這個 request 有沒有經過驗簽：沒有 body 的請求不會經過 parser，這裡記 log、回 401
+  - 兩條 401 都走 Fastify 的錯誤處理，回應格式一致
   - 「已驗過簽章」用 `WeakSet` 記錄，不改 `FastifyRequest` 的全域型別
-- 其他 route 不受影響：Fastify 的封裝範圍讓這個 parser 只套用在 `/webhook`
-- `test/webhook-signature.test.ts`：新增 16 項測試（Node 內建的 `node:test`，不用新套件）
-- `package.json`：新增 `test` script
+  - `GET /webhook` 留在外層，不受影響
+- 其他 route 不受影響：Fastify 的封裝範圍讓這個 parser 只套用在 POST webhook
+- `test/webhook-signature.test.ts`：新增 19 項測試（Node 內建的 `node:test`，不用新套件），結束時還原換掉的全域 `fetch` 和 `require.cache`
+- `package.json`：新增 `test` script（`ts-node/register/transpile-only`，Windows 也能跑；測試檔的 glob 需要 Node 21 以上）
 - `CLAUDE.md`：常用指令加上 `npm test`
 
 ## 和計畫不同的地方
@@ -47,11 +51,16 @@ LINE 是對 webhook 請求的**原始 body** 計算 `x-line-signature`。目前�
   - 「已驗過簽章」的標記只留在 webhook 裡，不加到全 app 的型別上
   - 兩條 401 路徑都會記 log
   - 驗證腳本改成正式測試，放進 repo
+- 第二輪 code review 後：
+  - **修正這次引入的回歸**：驗簽搬進 parser 之後，parser 裡丟出的例外 Fastify 不會接住。沒設定 `LINE_CHANNEL_SECRET` 時，任何 JSON POST 都會讓 process 直接掛掉（修正前只是回 500）。已實際重現，改成包 try/catch 回 500
+  - 驗簽 parser 改放只包 POST webhook 的子範圍，並移除繼承的其他 parser（`text/plain` 從 401 改成 415）
+  - 沒帶簽章 header 和簽章錯誤分開記 log；兩條 401 的回應格式一致
+  - 測試結束時還原全域狀態；test script 不用 POSIX 的環境變數寫法
 
 ## 驗證
 
 - `npx tsc --noEmit` 通過（包含測試檔）
-- `npm test`：16 項全部通過。同一份測試在修正前的 main 上跑，有 7 項失敗，可以擋住改回舊寫法的情況：
+- `npm test`：19 項全部通過。同一份測試在修正前的 main 上跑，有 9 項失敗，可以擋住改回舊寫法的情況：
 
   | 情境 | 修正前 | 修正後 |
   |---|---|---|
@@ -69,8 +78,13 @@ LINE 是對 webhook 請求的**原始 body** 計算 `x-line-signature`。目前�
   | 沒有 body | 401 | 401 |
   | 簽章正確但 JSON 不合法 | 400 | 400 |
   | 簽章正確但夾帶 `__proto__` | 400 | 400 |
-  | `text/plain`（不經過驗簽的 parser） | 401 | 401 |
+  | `text/plain` | 401 | **415** |
+  | 兩種 401（簽章錯誤、沒有 body）的回應格式 | 不同 | **相同** |
+  | 沒設定 `LINE_CHANNEL_SECRET` | 500 | 500，process 不會掛掉 |
+  | `GET /webhook` | 200 | 200 |
   | 其他 route（`POST /playlist/add`）的 JSON 解析 | 正常 | 正常 |
+
+- 之前 fastify 5 升級用的完整流程測試（登入、callback、搜尋等 10 項）在這個 branch 上全部通過
 
 - 尚未在真的 LINE 上實測
 
@@ -78,12 +92,16 @@ LINE 是對 webhook 請求的**原始 body** 計算 `x-line-signature`。目前�
 
 - 不需要新的環境變數，也不需要重新登入
 - 原本會被誤擋的訊息現在會正常處理；簽章檢查的嚴格程度沒有降低
-- 沒有簽章、而且 JSON 不合法的請求，回應從 400 改成 401
-- 簽章錯誤時的 log 從 `console.log("Signature mismatch")` 改成 Fastify logger 的 `LINE signature mismatch`（warn）
+- 回應有幾處改變，LINE 只看狀態碼是不是 200，不受影響：
+  - 沒有簽章、而且 JSON 不合法：400 → 401
+  - `text/plain` 等其他 content type：401 → 415
+  - 401 的回應內容從純文字 `Unauthorized` 改成 Fastify 的 JSON 錯誤格式
+- log 從 `console.log("Signature mismatch")` 改成 Fastify logger 的 warn：`LINE signature header missing`、`LINE signature mismatch`、`LINE signature missing: request has no body`
 
 ## code review 中不處理的項目
 
-無
+- 「`tsconfig.json` 沒有排除 `test/`，`yarn build` 會把測試檔也編譯成 `.js`」：Vercel 只會打包 `api/serverless.ts` 追蹤到的檔案，測試不會進到 function；排除掉的話，`npx tsc --noEmit` 就不會檢查測試檔的型別
+- 「`fix(webhook)` 的 commit 裡混了 `CLAUDE.md` 和測試設定」：測試是為了這個修正加的，留在同一個 PR。第二輪修正已經把程式（`fix(webhook)`）和測試（`test(webhook)`）分成不同 commit
 
 ## 後續待辦
 
