@@ -42,25 +42,48 @@ const webhook = (
   opts: FastifyServerOptions,
   done: any
 ) => {
+  fastify.register(signedWebhookRoute);
+
+  fastify.get(routeLink.default, async (_request, reply) => {
+    return reply.status(200).send("Webhook GET route is active");
+  });
+
+  done();
+};
+
+// 驗簽用的 parser 只放在這個子範圍，只影響 LINE 的 POST webhook
+const signedWebhookRoute = (
+  scope: FastifyInstance,
+  _opts: FastifyServerOptions,
+  scopeDone: any
+) => {
   // LINE 對原始 bytes 計算簽章，所以要在解析 JSON 之前、用原始 bytes 驗證
-  const defaultJsonParser = fastify.getDefaultJsonParser(
-    fastify.initialConfig.onProtoPoisoning ?? "error",
-    fastify.initialConfig.onConstructorPoisoning ?? "error"
+  const defaultJsonParser = scope.getDefaultJsonParser(
+    scope.initialConfig.onProtoPoisoning ?? "error",
+    scope.initialConfig.onConstructorPoisoning ?? "error"
   );
-  fastify.removeContentTypeParser("application/json");
-  fastify.addContentTypeParser(
+  scope.removeAllContentTypeParsers();
+  scope.addContentTypeParser(
     "application/json",
     { parseAs: "buffer" },
     (request, body, parseDone) => {
       const signature = request.headers["x-line-signature"];
-      if (
-        typeof signature !== "string" ||
-        !validateSignature(
+      if (typeof signature !== "string") {
+        request.log.warn("LINE signature header missing");
+        return parseDone(unauthorizedError(), undefined);
+      }
+      // parser 裡丟出的例外 Fastify 不會接住，會讓整個 process 掛掉，所以要自己轉成錯誤
+      let valid: boolean;
+      try {
+        valid = validateSignature(
           body as Buffer,
           process.env.LINE_CHANNEL_SECRET!,
           signature
-        )
-      ) {
+        );
+      } catch (error) {
+        return parseDone(error as Error, undefined);
+      }
+      if (!valid) {
         request.log.warn("LINE signature mismatch");
         return parseDone(unauthorizedError(), undefined);
       }
@@ -69,13 +92,13 @@ const webhook = (
     }
   );
 
-  fastify.post(
+  scope.post(
     routeLink.default,
     async (request: WebhookRequest, reply: FastifyReply) => {
-      // 沒有 JSON body 的請求不會經過上面的 parser，也就沒有驗過簽章
+      // 沒有 body 的請求不會經過上面的 parser，也就沒有驗過簽章
       if (!signatureVerified.has(request)) {
-        request.log.warn("LINE signature missing");
-        return reply.status(401).send("Unauthorized");
+        request.log.warn("LINE signature missing: request has no body");
+        throw unauthorizedError();
       }
 
       const events = request.body.events;
@@ -109,11 +132,7 @@ const webhook = (
     }
   );
 
-  fastify.get(routeLink.default, async (_request, reply) => {
-    return reply.status(200).send("Webhook GET route is active");
-  });
-
-  done();
+  scopeDone();
 };
 
 const buildLoginReplyText = (lineUserId: string): string => {
