@@ -13,6 +13,7 @@ Object.assign(process.env, {
 
 // mongoDbUtils 會 import api/serverless（載入時就 listen），測試時換成替身
 const mongoPath = require.resolve(path.join(__dirname, "../src/utils/mongoDbUtils.ts"));
+const originalMongoModule = require.cache[mongoPath];
 require.cache[mongoPath] = {
   id: mongoPath,
   filename: mongoPath,
@@ -21,6 +22,7 @@ require.cache[mongoPath] = {
 } as any;
 
 const lineReplies: any[] = [];
+const originalFetch = globalThis.fetch;
 (globalThis as any).fetch = async (url: string, init: any = {}) => {
   if (url.startsWith("https://line.test")) lineReplies.push(JSON.parse(init.body));
   return { ok: true, status: 200, json: async () => ({}), text: async () => "" };
@@ -51,7 +53,12 @@ before(async () => {
   app.register(playlist, { prefix: "/playlist" });
   await app.ready();
 });
-after(() => app.close());
+after(async () => {
+  await app.close();
+  globalThis.fetch = originalFetch;
+  if (originalMongoModule) require.cache[mongoPath] = originalMongoModule;
+  else delete require.cache[mongoPath];
+});
 
 const accepted: [string, string][] = [
   ["壓縮過的 JSON（LINE 驗證 webhook 用的空 events）", `{"destination":"Uxx","events":[]}`],
@@ -111,14 +118,41 @@ test("簽章正確但夾帶 __proto__：400（沿用 Fastify 內建的防護）"
   assert.equal((await postSigned(raw)).statusCode, 400);
 });
 
-test("text/plain 不會經過驗簽的 JSON parser，handler 也要擋下：401", async () => {
+test("webhook 只接受 JSON：text/plain 回 415", async () => {
   const res = await app.inject({
     method: "POST",
     url: "/webhook/",
     headers: { "content-type": "text/plain", "x-line-signature": sign("x") },
     payload: "x",
   });
-  assert.equal(res.statusCode, 401);
+  assert.equal(res.statusCode, 415);
+});
+
+test("兩種 401（簽章錯誤、沒有 body）的回應格式一樣", async () => {
+  const mismatch = await post(`{"destination":"Uxx","events":[]}`, { "x-line-signature": "AAAA" });
+  const noBody = await app.inject({ method: "POST", url: "/webhook/" });
+  assert.equal(mismatch.statusCode, 401);
+  assert.equal(noBody.statusCode, 401);
+  assert.deepEqual(mismatch.json(), noBody.json());
+  assert.equal(mismatch.json().statusCode, 401);
+});
+
+test("沒設定 LINE_CHANNEL_SECRET：回 500，process 不會掛掉", async () => {
+  const saved = process.env.LINE_CHANNEL_SECRET;
+  delete process.env.LINE_CHANNEL_SECRET;
+  try {
+    const res = await post(`{"destination":"Uxx","events":[]}`, { "x-line-signature": "AAAA" });
+    assert.equal(res.statusCode, 500);
+  } finally {
+    process.env.LINE_CHANNEL_SECRET = saved;
+  }
+  assert.equal((await postSigned(`{"destination":"Uxx","events":[]}`)).statusCode, 200);
+});
+
+test("GET /webhook 照常運作", async () => {
+  const res = await app.inject({ method: "GET", url: "/webhook/" });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body, "Webhook GET route is active");
 });
 
 test("其他 route 的 JSON 解析不受影響", async () => {

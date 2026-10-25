@@ -10,7 +10,7 @@
     "dev": "nodemon --watch api/serverless.ts",
     "build": "tsc -p tsconfig.json",
     "vercel": "vercel dev",
-    "test": "TS_NODE_TRANSPILE_ONLY=true node --require ts-node/register --test \"test/**/*.test.ts\""
+    "test": "node --require ts-node/register/transpile-only --test \"test/**/*.test.ts\""
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.3",
