@@ -14,5 +14,6 @@
 - [ ] `npx tsc --noEmit`
 - [ ]
 
-## 紀錄
-`docs/plan/YYYY-MM-DD-<topic>.md`
+## Plan
+<!-- 這個 PR 完成的 `<initiative>/W-NN`；沒有 plan 就寫「無」 -->
+- 無

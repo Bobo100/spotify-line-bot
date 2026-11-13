@@ -21,33 +21,35 @@ LINE Bot 控制 Spotify 的 side project：Fastify (serverless on Vercel) + Mong
   git branch -d <branch>
   ```
 
-### 2. 改動要記錄在 `docs/plan/`
+### 2. 文件放哪
 
-- 每個 PR 都要在 `docs/plan/` 新增（或更新）一份紀錄，跟程式碼放在同一個 PR。
-- 檔名：`YYYY-MM-DD-<topic>.md`，格式照 `docs/plan/README.md` 的範本（固定 8 個段落，順序和標題不改，沒內容寫「無」）。檔名開頭是日期，照檔名排序就是時間順序，不另外維護索引。
-- 紀錄不寫狀態欄位；PR 是否 merge 看 GitHub 上的 PR 頁面。
-- 實作途中計畫改變時，更新同一份紀錄，不另開新檔。
+- 新增、重構、移除功能（`feat` / `refactor`）的 PR 在 `docs/<initiative>/plan.md` 開 plan（`<initiative>` 是小寫 kebab-case、不帶日期），格式照 plan-lifecycle 的 plan format 2；每個 commit 標題結尾加 `(<initiative>/W-NN)`。完成的 initiative 整個資料夾搬到 `docs/archive/`。
+- 修 bug、升級相依、chore、CI、只改文件的 PR 不寫 plan，背景、驗證和注意事項寫在 PR 描述。
+- 功能屬於還開著的 plan 就加項目進那份 plan，不另開；改到 `docs/<topic>.md` 描述的行為或結構時，同一個 PR 更新那份文件。
+- 系統現在怎麼運作、改 code 前要知道的限制寫 `docs/<topic>.md`；`docs/` 只放這些、`docs/<initiative>/` 和 `docs/archive/`（`.plan-lint.json` 的 `"docs": 1` 會檢查）。
+- 舊的每 PR 一份紀錄（PR #1～#6、#8、#9）封存在 `docs/archive/pr-records/`，唯讀。
 
 ### 3. 每個 PR 的完整流程
 
 每次都照這個順序，不跳步驟：
 
-1. 開 worktree 和 branch，先在 `docs/plan/` 寫好紀錄的「背景」和「計畫」
+1. 開 worktree 和 branch；要寫 plan 的先寫好 plan 的目標和項目
 2. 實作，並驗證（至少 `npx tsc --noEmit`，能測的行為要實際跑過）
-3. 把紀錄的計畫打勾、補上「實際改動」和「驗證」，跟程式碼一起 commit
-4. 開 PR（格式見「PR 格式」），再用一個 commit 補上紀錄裡的 PR 編號
+3. 跟程式碼一起 commit
+4. 開 PR（格式見「PR 格式」）
 5. 跑 code review 和對抗性驗證；逐項驗證後修正，沒修的寫明原因
-6. 修正後**一定要回頭更新紀錄**（「實際改動」、「和計畫不同的地方」、「驗證」、「code review 中不處理的項目」、「後續待辦」）和 PR 描述，讓兩者跟最終程式碼一致
+6. 修正後**一定要回頭更新** PR 描述（有 plan 的連同 plan），讓它跟最終程式碼一致；有 plan 的在 merge 前再用一個 commit 補上完成項目的 `Done:` 紀錄（附 PR 編號和驗證結果）
 7. merge：一律用 merge commit（不用 squash / rebase），訊息用 GitHub 預設的 `Merge pull request #N from ...`（merge commit 不套用下方的 commit 格式）
 8. 收尾：移除 worktree、刪除本機 branch、主 checkout 的 `main` 更新到最新
 
 ## PR 格式
 
-- 標題格式和 commit 標題一樣（見下方「Commit 訊息」），type 和 scope 用整個 PR 的主要目的；補 PR 編號、review 修正這類附帶的 commit 不影響標題。
-- 描述照 `.github/pull_request_template.md` 的段落，順序和標題都不改：`摘要`、`改動內容`、`影響與注意事項`、`測試`、`紀錄`。
+- 標題格式和 commit 標題一樣（見下方「Commit 訊息」），type 和 scope 用整個 PR 的主要目的；補 `Done:` 紀錄、review 修正這類附帶的 commit 不影響標題。
+- 描述照 `.github/pull_request_template.md` 的段落，順序和標題都不改：`摘要`、`改動內容`、`影響與注意事項`、`測試`、`Plan`。
 - 全部用中文；沒有內容的段落寫「無」，不要刪掉。
 - `測試` 用 checklist：做過的打勾，還沒做的（例如在 LINE 上實測）留空。
-- `紀錄` 放這個 PR 的 `docs/plan/` 檔案路徑。
+- `影響與注意事項` 也寫這次發現、但不在這個 PR 處理的問題。
+- `Plan` 列這個 PR 完成的 `<initiative>/W-NN`；沒有 plan 寫「無」。
 
 ## Commit 訊息
 
@@ -78,9 +80,9 @@ BREAKING CHANGE: <有破壞性變更時才寫>
   - `playlist`：歌單、加歌
   - `webhook`：LINE webhook 的分派與指令
   - `db`：MongoDB 資料結構
-  - `plan`：只改 `docs/plan/` 的紀錄
+  - `plan`：只改 `docs/<initiative>/plan.md`
   - 只改流程文件（`CLAUDE.md`、`.github/` 範本）或同時影響多個功能：不寫 scope
-- 補 PR 編號的 commit 固定寫成：`docs(plan): 補上 <topic> 紀錄的 PR 編號`。
+- 補 `Done:` 紀錄的 commit 固定寫成：`docs(plan): 補上 <initiative> 的 Done 紀錄 (<initiative>/W-NN)`（plan branch 上的 commit 都要帶這個結尾）。
 - 有破壞性變更時，type 後面加 `!`（例如 `feat(db)!:`），並在最後一段寫 `BREAKING CHANGE:` 說明。
 - 摘要不加句號，盡量在 50 字以內；內文每行約 72 字元換行。
 - 歷史：2026-10-23 已改寫 PR #1～#3 的 commit（作者改成 `Bobo100`、訊息改成這個格式）；更早的 `[what] ...` commit 保留原樣。之後不再改寫 `main` 的歷史。
